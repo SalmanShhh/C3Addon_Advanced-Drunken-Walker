@@ -1,117 +1,746 @@
 {
   "languageTag": "en-US",
-  "fileDescription": "Strings for sample_addon.",
+  "fileDescription": "Strings for salmanshh_advdrunkenwalkers.",
   "text": {
     "plugins": {
-      "sample_addon": {
-        "name": "Sample Addon",
-        "description": "Description",
+      "salmanshh_advdrunkenwalkers": {
+        "name": "Advanced Drunken Walkers",
+        "description": "Seeded drunkard's-walk generation engine. Carves organic maps with configurable walkers and scatters tagged marks - logic only, you draw the result.",
         "help-url": "https://www.construct.net",
         "aceCategories": {
-          "Ace_Folders_In_Category_Folder": "Ace_Folders_In_Category_Folder",
-          "Aces_Files_In_Category_Folder": "Aces_Files_In_Category_Folder",
-          "Aces_In_Single_File": "Aces_In_Single_File"
+          "Grid": "Grid",
+          "Marks": "Marks",
+          "Post_Processing": "Post-Processing",
+          "Randomness": "Randomness",
+          "Walkers": "Walkers"
         },
-        "properties": {},
+        "properties": {
+          "gridWidth": {
+            "name": "Grid Width",
+            "desc": "Columns created by Create Grid when it is called with a width of 0."
+          },
+          "gridHeight": {
+            "name": "Grid Height",
+            "desc": "Rows created by Create Grid when it is called with a height of 0."
+          },
+          "maxGridSize": {
+            "name": "Max Grid Size",
+            "desc": "Hard cap on both axes. Create Grid clamps to this and warns in debug mode - a safety net against runaway expressions."
+          },
+          "cellSize": {
+            "name": "Cell Size",
+            "desc": "Pixel size of one cell, used by the cell to layout coordinate expressions."
+          },
+          "originX": {
+            "name": "Origin X",
+            "desc": "Layout X of the grid's top-left corner, for the coordinate expressions."
+          },
+          "originY": {
+            "name": "Origin Y",
+            "desc": "Layout Y of the grid's top-left corner, for the coordinate expressions."
+          },
+          "emptyValue": {
+            "name": "Empty Value",
+            "desc": "The value the grid is filled with on creation and by Clear Grid."
+          },
+          "seed": {
+            "name": "Seed",
+            "desc": "Initial seed. Leave empty to derive one from the current time (non-deterministic until Set Seed is called)."
+          },
+          "randomSource": {
+            "name": "Random Source",
+            "desc": "Where random values come from: the built-in seeded PRNG, or the queue filled by Inject Random.",
+            "items": {
+              "internal_seeded": "Internal seeded",
+              "injected": "Injected"
+            }
+          },
+          "debugMode": {
+            "name": "Debug Mode",
+            "desc": "Log walker lifecycles, re-rolled boundary steps, clamped grid sizes and injected-queue underruns to the browser console."
+          }
+        },
         "actions": {
-          "ActionCombo": {
-            "list-name": "Sample Action Combo",
-            "display-text": "Sample Action Combo {0}",
-            "description": "This is a sample action",
+          "ClearGrid": {
+            "list-name": "Clear grid",
+            "display-text": "{my} clear grid to [i]{0}[/i]",
+            "description": "Fill every cell with the given value without touching walkers, marks or the random stream. Does not fire On Cell Carved.",
             "params": {
-              "param1": {
-                "name": "Param1",
-                "desc": "This is a sample param",
+              "value": {
+                "name": "Value",
+                "desc": "The value written into every cell."
+              }
+            }
+          },
+          "CreateGrid": {
+            "list-name": "Create grid",
+            "display-text": "{my} create grid [i]{0}[/i] x [i]{1}[/i]",
+            "description": "Allocate the grid filled with the Empty Value, clamped to Max Grid Size. Pass 0 for either dimension to use the property default. Destroys any previous grid, walkers and marks.",
+            "params": {
+              "width": {
+                "name": "Width",
+                "desc": "Columns, or 0 to use the Grid Width property."
+              },
+              "height": {
+                "name": "Height",
+                "desc": "Rows, or 0 to use the Grid Height property."
+              }
+            }
+          },
+          "SetCell": {
+            "list-name": "Set cell",
+            "display-text": "{my} set cell ([i]{0}[/i], [i]{1}[/i]) to [i]{2}[/i]",
+            "description": "Write one cell directly, useful for pre-placing anchors before walkers run. Does not fire On Cell Carved.",
+            "params": {
+              "col": {
+                "name": "Column",
+                "desc": "Cell column."
+              },
+              "row": {
+                "name": "Row",
+                "desc": "Cell row."
+              },
+              "value": {
+                "name": "Value",
+                "desc": "The value to write."
+              }
+            }
+          },
+          "SetOrigin": {
+            "list-name": "Set origin",
+            "display-text": "{my} set grid origin to ([i]{0}[/i], [i]{1}[/i]) with cell size [i]{2}[/i]",
+            "description": "Reposition the grid in layout space for the coordinate expressions. Pass 0 for the cell size to keep the current value.",
+            "params": {
+              "x": {
+                "name": "X",
+                "desc": "Layout X of the grid's top-left corner."
+              },
+              "y": {
+                "name": "Y",
+                "desc": "Layout Y of the grid's top-left corner."
+              },
+              "cellSize": {
+                "name": "Cell Size",
+                "desc": "Pixel size of one cell, or 0 to keep the current value."
+              }
+            }
+          },
+          "ClearMarks": {
+            "list-name": "Clear marks",
+            "display-text": "{my} clear marks tagged [i]{0}[/i]",
+            "description": "Remove all marks with the tag. An empty string removes every mark.",
+            "params": {
+              "tag": {
+                "name": "Tag",
+                "desc": "Tag to clear, or empty to clear every mark."
+              }
+            }
+          },
+          "DropMarksAlongWalk": {
+            "list-name": "Drop marks along walk",
+            "display-text": "{my} drop [i]{1}[/i] marks along walker [b]{0}[/b] every [i]{2}[/i] steps, chance [i]{3}[/i], min spacing [i]{4}[/i]",
+            "description": "Place tagged marks along a walker's recorded path: a candidate every N steps, kept with the given 0-1 chance, discarded when it lands within min spacing cells of a same-tag mark. Fires On Mark Placed per mark.",
+            "params": {
+              "walkerId": {
+                "name": "Walker ID",
+                "desc": "The walker whose path to walk along."
+              },
+              "tag": {
+                "name": "Tag",
+                "desc": "Tag given to every mark placed by this pass."
+              },
+              "everySteps": {
+                "name": "Every Steps",
+                "desc": "Consider a candidate every N steps of the walk."
+              },
+              "chance": {
+                "name": "Chance",
+                "desc": "Probability from 0 to 1 that a candidate is kept."
+              },
+              "minSpacing": {
+                "name": "Min Spacing",
+                "desc": "Minimum distance in cells between two marks of this tag. 0 still prevents two marks stacking on one cell."
+              }
+            }
+          },
+          "ScatterMarks": {
+            "list-name": "Scatter marks",
+            "display-text": "{my} scatter [i]{1}[/i] [i]{0}[/i] marks on cells valued [i]{2}[/i], placement [i]{3}[/i], min spacing [i]{4}[/i]",
+            "description": "Deterministically scatter up to count tagged marks onto cells holding the value. Interior requires all 8 neighbours to match (open areas), edge requires at least one that does not (against walls). Fires On Mark Placed per mark.",
+            "params": {
+              "tag": {
+                "name": "Tag",
+                "desc": "Tag given to every mark placed by this pass."
+              },
+              "count": {
+                "name": "Count",
+                "desc": "How many marks to place at most."
+              },
+              "cellValue": {
+                "name": "Cell Value",
+                "desc": "Only cells holding this value are eligible."
+              },
+              "placement": {
+                "name": "Placement",
+                "desc": "Which eligible cells to use.",
                 "items": {
-                  "test": "test",
-                  "test2": "test2"
+                  "any": "Any",
+                  "interior": "Interior",
+                  "edge": "Edge"
+                }
+              },
+              "minSpacing": {
+                "name": "Min Spacing",
+                "desc": "Minimum distance in cells between two marks of this tag. 0 still prevents two marks stacking on one cell."
+              }
+            }
+          },
+          "DilateCells": {
+            "list-name": "Dilate cells",
+            "display-text": "{my} dilate cells valued [i]{0}[/i] by [i]{1}[/i] iterations",
+            "description": "Expand every region of the given value outward by one cell per iteration, widening corridors into chambers. Any cell with an 8-way neighbour holding the value is converted. Fires On Cell Carved for each newly converted cell.",
+            "params": {
+              "value": {
+                "name": "Value",
+                "desc": "The value whose regions grow."
+              },
+              "iterations": {
+                "name": "Iterations",
+                "desc": "How many times to expand by one cell."
+              }
+            }
+          },
+          "OutlineCells": {
+            "list-name": "Outline cells",
+            "display-text": "{my} outline cells valued [i]{0}[/i] with [i]{1}[/i]",
+            "description": "Write the outline value into every Empty Value cell adjacent 8-way to a cell holding the value - the classic put walls around the floor pass. Fires On Cell Carved for each written cell.",
+            "params": {
+              "value": {
+                "name": "Value",
+                "desc": "The value to outline, for example your floor value."
+              },
+              "outlineValue": {
+                "name": "Outline Value",
+                "desc": "The value written into the surrounding empty cells."
+              }
+            }
+          },
+          "InjectRandom": {
+            "list-name": "Inject random",
+            "display-text": "{my} inject random value [i]{0}[/i]",
+            "description": "Queue one 0-1 value for injected mode, for example AdvancedRandom.Random. A queue underrun during generation falls back to the internal PRNG and warns in debug mode.",
+            "params": {
+              "value": {
+                "name": "Value",
+                "desc": "A value between 0 and 1."
+              }
+            }
+          },
+          "SetRandomSource": {
+            "list-name": "Set random source",
+            "display-text": "{my} set random source to [i]{0}[/i]",
+            "description": "Switch where random values come from. In injected mode generation consumes the queue filled by Inject Random, which routes every decision through another plugin's stream.",
+            "params": {
+              "source": {
+                "name": "Source",
+                "desc": "Which stream drives generation.",
+                "items": {
+                  "internal_seeded": "Internal seeded",
+                  "injected": "Injected"
                 }
               }
             }
           },
-          "Action": {
-            "list-name": "Sample Action",
-            "display-text": "Sample Action {0}",
-            "description": "This is a sample action",
+          "SetSeed": {
+            "list-name": "Set seed",
+            "display-text": "{my} set seed to [i]{0}[/i]",
+            "description": "Reset the internal PRNG with this seed. Call it before generation: the same seed with the same action order reproduces identical output. Pass AdvancedRandom.Seed here to share one master seed with the Advanced Random plugin.",
             "params": {
-              "param1": {
-                "name": "Param1",
-                "desc": "This is a sample param"
+              "seed": {
+                "name": "Seed",
+                "desc": "Seed string. Empty derives one from the current time."
               }
             }
           },
-          "AsyncAction": {
-            "list-name": "Sample Action Async",
-            "display-text": "Sample Action Async",
-            "description": "This is a sample action",
+          "AddWalker": {
+            "list-name": "Add walker",
+            "display-text": "{my} add walker [b]{0}[/b] at ([i]{1}[/i], [i]{2}[/i]), [i]{3}[/i] steps, [i]{4}[/i] directions, max turn [i]{5}[/i], tag [i]{6}[/i]",
+            "description": "Register a walker with the given core settings. Remaining fields use the Walker Definition defaults. Walkers run in registration order.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "Unique ID for this walker. Re-using an ID replaces that walker in place."
+              },
+              "startCol": {
+                "name": "Start Column",
+                "desc": "Starting cell column."
+              },
+              "startRow": {
+                "name": "Start Row",
+                "desc": "Starting cell row."
+              },
+              "steps": {
+                "name": "Steps",
+                "desc": "Total step budget."
+              },
+              "directions": {
+                "name": "Directions",
+                "desc": "Allowed headings, 1 to 8, evenly spaced from the start angle. 4 gives cardinal corridors, 8 allows diagonals, 1 walks a straight line."
+              },
+              "maxTurn": {
+                "name": "Max Turn",
+                "desc": "Largest heading change per step in degrees, 0 to 180. Low values wind smoothly, 180 gives classic jittery caves."
+              },
+              "tag": {
+                "name": "Tag",
+                "desc": "Groups walkers for Run Walkers By Tag. Empty for untagged."
+              }
+            }
+          },
+          "DefineWalker": {
+            "list-name": "Define walker",
+            "display-text": "{my} define walker from [i]{0}[/i]",
+            "description": "Register a walker from a full Walker Definition JSON string, for example {\"id\":\"cave\",\"startCol\":32,\"startRow\":32,\"steps\":400,\"directions\":8,\"maxTurn\":180,\"startAngle\":0,\"turnChance\":1,\"carveValue\":1,\"brushSize\":1,\"tag\":\"\"}. Replaces any existing walker with the same id.",
+            "params": {
+              "definition": {
+                "name": "Definition",
+                "desc": "Walker Definition as a JSON string. Only id, startCol and startRow are required."
+              }
+            }
+          },
+          "RemoveWalker": {
+            "list-name": "Remove walker",
+            "display-text": "{my} remove walker [b]{0}[/b]",
+            "description": "Unregister the walker. Cells it already carved are unaffected.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to remove."
+              }
+            }
+          },
+          "RunAllWalkers": {
+            "list-name": "Run all walkers",
+            "display-text": "{my} run all walkers",
+            "description": "Execute every registered walker to the end of its step budget, in registration order, firing On Cell Carved per newly carved cell and On Walker Finished per walker, then On Generation Complete.",
             "params": {}
           },
-          "SampleAction": {
-            "list-name": "Sample Action",
-            "display-text": "Sample Action {0}",
-            "description": "This is a sample action",
+          "RunWalker": {
+            "list-name": "Run walker",
+            "display-text": "{my} run walker [b]{0}[/b]",
+            "description": "Execute one walker to completion, firing its carve and finish triggers. Does not fire On Generation Complete.",
             "params": {
-              "param1": {
-                "name": "Param1",
-                "desc": "This is a sample param"
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to run."
+              }
+            }
+          },
+          "RunWalkersByTag": {
+            "list-name": "Run walkers by tag",
+            "display-text": "{my} run walkers tagged [i]{0}[/i]",
+            "description": "Execute every registered walker carrying the tag, in registration order, then fire On Walkers By Tag Complete. Lets you stage generation in passes. An empty tag runs only untagged walkers.",
+            "params": {
+              "tag": {
+                "name": "Tag",
+                "desc": "Walker tag to run. Empty runs only untagged walkers."
+              }
+            }
+          },
+          "SetWalkerDigSize": {
+            "list-name": "Set walker dig size",
+            "display-text": "{my} set walker [b]{0}[/b] dig size to [i]{1}[/i] wide by [i]{2}[/i] deep",
+            "description": "Make a walker dig out a rectangle that turns with it instead of a fixed square. Width is measured across the direction it faces, so it is the corridor width, and is always centred. Depth is measured along that direction and is signed: a positive digs forward from the walker's own cell, a negative digs behind it, and either way its own cell is included, so 1 and -1 both mean just that cell. A walker facing right digs a corridor width cells tall, and the same walker facing down digs one width cells wide. Pass 0 for a dimension to fall back to the walker's brush size for that axis, and 0 for both to restore the plain square brush.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to resize."
+              },
+              "width": {
+                "name": "Width",
+                "desc": "Cells across the direction the walker faces, so the corridor width. Always centred. 0 uses the brush size."
+              },
+              "depth": {
+                "name": "Depth",
+                "desc": "Cells along the direction the walker faces. Positive digs ahead of the walker, negative digs behind it, and its own cell is always included. 0 uses the brush size."
+              }
+            }
+          },
+          "SetWalkerDirectionWeights": {
+            "list-name": "Set walker direction weights",
+            "display-text": "{my} set walker [b]{0}[/b] direction weights to [i]{1}[/i]",
+            "description": "Bias which way a walker turns. Weights are relative, comma separated, one per direction in direction order: entry 0 is the walker's start angle and the rest follow it clockwise. A weight of 0 rules a direction out, and any entry you leave off counts as 1. Missing directions still apply, so \"3,1,1\" on an 8 direction walker weights the first three and leaves the other five at 1. Leave the string empty to go back to equal weights.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to weight."
+              },
+              "weights": {
+                "name": "Weights",
+                "desc": "Comma separated relative weights in direction order, e.g. \"4,2,1,0,0,0,1,2\". Empty restores equal weights."
+              }
+            }
+          },
+          "StepWalker": {
+            "list-name": "Step walker",
+            "display-text": "{my} step walker [b]{0}[/b] by [i]{1}[/i]",
+            "description": "Advance one walker by up to N steps, the animated-generation path. Fires On Walker Stepped per step and On Walker Finished when the budget is exhausted.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to step."
+              },
+              "steps": {
+                "name": "Steps",
+                "desc": "How many steps to advance at most."
               }
             }
           }
         },
         "conditions": {
-          "ConditionCombo": {
-            "list-name": "Sample Condition",
-            "display-text": "Sample Condition {0}",
-            "description": "This is a sample condition",
+          "IsCellValue": {
+            "list-name": "Is cell value",
+            "display-text": "Cell ([i]{0}[/i], [i]{1}[/i]) is [i]{2}[/i]",
+            "description": "True if the cell holds exactly the given value. Out-of-bounds cells match nothing.",
             "params": {
-              "param1": {
-                "name": "Param1",
-                "desc": "This is a sample param",
-                "items": {
-                  "TRUE": "True",
-                  "FALSE": "False"
-                }
+              "col": {
+                "name": "Column",
+                "desc": "Cell column."
+              },
+              "row": {
+                "name": "Row",
+                "desc": "Cell row."
+              },
+              "value": {
+                "name": "Value",
+                "desc": "The value to compare against."
               }
             }
           },
-          "Condition": {
-            "list-name": "Sample Condition",
-            "display-text": "Sample Condition {0}",
-            "description": "This is a sample condition",
+          "IsInsideGrid": {
+            "list-name": "Is inside grid",
+            "display-text": "([i]{0}[/i], [i]{1}[/i]) is inside the grid",
+            "description": "True if the coordinates fall within the current grid.",
             "params": {
-              "param1": {
-                "name": "Param1",
-                "desc": "This is a sample param"
+              "col": {
+                "name": "Column",
+                "desc": "Cell column."
+              },
+              "row": {
+                "name": "Row",
+                "desc": "Cell row."
               }
             }
           },
-          "Trigger": {
-            "list-name": "Sample Trigger",
-            "display-text": "Sample Trigger",
-            "description": "This is a sample trigger",
+          "HasMarkAt": {
+            "list-name": "Has mark at",
+            "display-text": "Cell ([i]{0}[/i], [i]{1}[/i]) has a [i]{2}[/i] mark",
+            "description": "True if a mark with the tag sits on that cell. An empty tag matches any mark.",
+            "params": {
+              "col": {
+                "name": "Column",
+                "desc": "Cell column."
+              },
+              "row": {
+                "name": "Row",
+                "desc": "Cell row."
+              },
+              "tag": {
+                "name": "Tag",
+                "desc": "Mark tag to look for, or empty for any mark."
+              }
+            }
+          },
+          "OnMarkPlaced": {
+            "list-name": "On mark placed",
+            "display-text": "On [i]{0}[/i] mark placed",
+            "description": "Fires once per mark from Drop Marks Along Walk and Scatter Marks. Use MarkCol, MarkRow and MarkTag inside. An empty filter matches all tags.",
+            "params": {
+              "tag": {
+                "name": "Tag",
+                "desc": "Mark tag to match, or empty for any tag."
+              }
+            }
+          },
+          "HasWalker": {
+            "list-name": "Has walker",
+            "display-text": "Walker [b]{0}[/b] is registered",
+            "description": "True if a walker with the id is currently registered.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "Walker ID to look for."
+              }
+            }
+          },
+          "OnCellCarved": {
+            "list-name": "On cell carved",
+            "display-text": "On cell carved",
+            "description": "Fires once per cell whose value changes during walker runs, dilation or outlining. Use CarvedCol, CarvedRow, CarvedValue and WalkerID inside. On big grids prefer iterating results after generation over per-cell spawning here.",
             "params": {}
           },
-          "SampleCondition": {
-            "list-name": "Sample Condition",
-            "display-text": "Sample Condition",
-            "description": "This is a sample condition",
+          "OnGenerationComplete": {
+            "list-name": "On generation complete",
+            "display-text": "On generation complete",
+            "description": "Fires after Run All Walkers finishes every walker. The idiomatic place to run mark passes and paint your tilemap via the Count and Index expressions.",
             "params": {}
+          },
+          "OnWalkerFinished": {
+            "list-name": "On walker finished",
+            "display-text": "On walker [b]{0}[/b] finished",
+            "description": "Fires when a walker exhausts its step budget or runs out of legal moves. WalkerCol and WalkerRow give its final cell, useful for chaining the next walker onto this one's endpoint. An empty filter matches all walkers.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "Walker ID to match, or empty for any walker."
+              }
+            }
+          },
+          "OnWalkersByTagComplete": {
+            "list-name": "On walkers by tag complete",
+            "display-text": "On walkers tagged [i]{0}[/i] complete",
+            "description": "Fires after a Run Walkers By Tag call finishes its whole batch. The batch tag is readable via WalkerTag inside. An empty filter matches any batch.",
+            "params": {
+              "tag": {
+                "name": "Tag",
+                "desc": "Batch tag to match, or empty for any batch."
+              }
+            }
+          },
+          "OnWalkerStepped": {
+            "list-name": "On walker stepped",
+            "display-text": "On walker [b]{0}[/b] stepped",
+            "description": "Fires after each step of Step Walker only, batch runs skip it for speed. WalkerCol, WalkerRow, WalkerAngle and WalkerStepsLeft are valid inside. An empty filter matches all walkers.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "Walker ID to match, or empty for any walker."
+              }
+            }
           }
         },
         "expressions": {
-          "Expression2": {
-            "translated-name": "Expression2",
-            "description": "Sample Expression",
+          "CellToLayoutX": {
+            "translated-name": "CellToLayoutX",
+            "description": "Layout X of the cell's centre, from Origin X and Cell Size.",
+            "params": {
+              "col": {
+                "name": "Column",
+                "desc": "Cell column."
+              }
+            }
+          },
+          "CellToLayoutY": {
+            "translated-name": "CellToLayoutY",
+            "description": "Layout Y of the cell's centre, from Origin Y and Cell Size.",
+            "params": {
+              "row": {
+                "name": "Row",
+                "desc": "Cell row."
+              }
+            }
+          },
+          "CellValue": {
+            "translated-name": "CellValue",
+            "description": "Value at the cell. Returns the Empty Value for out-of-bounds queries.",
+            "params": {
+              "col": {
+                "name": "Column",
+                "desc": "Cell column."
+              },
+              "row": {
+                "name": "Row",
+                "desc": "Cell row."
+              }
+            }
+          },
+          "CountCells": {
+            "translated-name": "CountCells",
+            "description": "Total cells currently holding the value. Pairs with GetCellColByIndex and GetCellRowByIndex to iterate results.",
+            "params": {
+              "value": {
+                "name": "Value",
+                "desc": "The value to count."
+              }
+            }
+          },
+          "GetCellColByIndex": {
+            "translated-name": "GetCellColByIndex",
+            "description": "Column of the index-th cell holding the value, 0-based in a stable row-major order. Returns -1 when out of range.",
+            "params": {
+              "value": {
+                "name": "Value",
+                "desc": "The value to look up."
+              },
+              "index": {
+                "name": "Index",
+                "desc": "0-based index."
+              }
+            }
+          },
+          "GetCellRowByIndex": {
+            "translated-name": "GetCellRowByIndex",
+            "description": "Row of the index-th cell holding the value, 0-based in a stable row-major order. Returns -1 when out of range.",
+            "params": {
+              "value": {
+                "name": "Value",
+                "desc": "The value to look up."
+              },
+              "index": {
+                "name": "Index",
+                "desc": "0-based index."
+              }
+            }
+          },
+          "GridCols": {
+            "translated-name": "GridCols",
+            "description": "Current grid width in cells.",
             "params": {}
           },
-          "Expression": {
-            "translated-name": "Expression",
-            "description": "Sample Expression",
+          "GridRows": {
+            "translated-name": "GridRows",
+            "description": "Current grid height in cells.",
             "params": {}
           },
-          "SampleExpression": {
-            "translated-name": "SampleExpression",
-            "description": "This is a sample expression",
+          "LayoutToCol": {
+            "translated-name": "LayoutToCol",
+            "description": "Column containing the layout X coordinate. May fall outside the grid.",
+            "params": {
+              "x": {
+                "name": "X",
+                "desc": "Layout X coordinate."
+              }
+            }
+          },
+          "LayoutToRow": {
+            "translated-name": "LayoutToRow",
+            "description": "Row containing the layout Y coordinate. May fall outside the grid.",
+            "params": {
+              "y": {
+                "name": "Y",
+                "desc": "Layout Y coordinate."
+              }
+            }
+          },
+          "NeighbourCount": {
+            "translated-name": "NeighbourCount",
+            "description": "How many of the 8 neighbours hold the given value, handy for autotiling and custom placement rules. Off-grid neighbours never match.",
+            "params": {
+              "col": {
+                "name": "Column",
+                "desc": "Cell column."
+              },
+              "row": {
+                "name": "Row",
+                "desc": "Cell row."
+              },
+              "value": {
+                "name": "Value",
+                "desc": "The value to look for."
+              }
+            }
+          },
+          "CountMarks": {
+            "translated-name": "CountMarks",
+            "description": "Marks with the tag. An empty tag counts every mark. Pairs with GetMarkColByIndex and GetMarkRowByIndex to iterate results.",
+            "params": {
+              "tag": {
+                "name": "Tag",
+                "desc": "Mark tag, or empty for all marks."
+              }
+            }
+          },
+          "GetMarkColByIndex": {
+            "translated-name": "GetMarkColByIndex",
+            "description": "Column of the index-th mark with the tag, 0-based in placement order. Returns -1 when out of range.",
+            "params": {
+              "tag": {
+                "name": "Tag",
+                "desc": "Mark tag, or empty for all marks."
+              },
+              "index": {
+                "name": "Index",
+                "desc": "0-based index."
+              }
+            }
+          },
+          "GetMarkRowByIndex": {
+            "translated-name": "GetMarkRowByIndex",
+            "description": "Row of the index-th mark with the tag, 0-based in placement order. Returns -1 when out of range.",
+            "params": {
+              "tag": {
+                "name": "Tag",
+                "desc": "Mark tag, or empty for all marks."
+              },
+              "index": {
+                "name": "Index",
+                "desc": "0-based index."
+              }
+            }
+          },
+          "MarkCol": {
+            "translated-name": "MarkCol",
+            "description": "Column of the mark just placed, inside On Mark Placed.",
+            "params": {}
+          },
+          "MarkRow": {
+            "translated-name": "MarkRow",
+            "description": "Row of the mark just placed, inside On Mark Placed.",
+            "params": {}
+          },
+          "MarkTag": {
+            "translated-name": "MarkTag",
+            "description": "Tag of the mark just placed, inside On Mark Placed.",
+            "params": {}
+          },
+          "CurrentSeed": {
+            "translated-name": "CurrentSeed",
+            "description": "The seed the PRNG was last set with.",
+            "params": {}
+          },
+          "CarvedCol": {
+            "translated-name": "CarvedCol",
+            "description": "Column of the cell just written, inside On Cell Carved.",
+            "params": {}
+          },
+          "CarvedRow": {
+            "translated-name": "CarvedRow",
+            "description": "Row of the cell just written, inside On Cell Carved.",
+            "params": {}
+          },
+          "CarvedValue": {
+            "translated-name": "CarvedValue",
+            "description": "Value just written into the cell, inside On Cell Carved.",
+            "params": {}
+          },
+          "WalkerAngle": {
+            "translated-name": "WalkerAngle",
+            "description": "Current heading of the triggering walker in degrees, 0 = right and 90 = down. Reads 0 outside walker triggers.",
+            "params": {}
+          },
+          "WalkerCol": {
+            "translated-name": "WalkerCol",
+            "description": "Current column of the triggering walker. Reads 0 outside walker triggers.",
+            "params": {}
+          },
+          "WalkerID": {
+            "translated-name": "WalkerID",
+            "description": "ID of the triggering walker, inside walker triggers and On Cell Carved. Empty for post-processing passes and outside triggers.",
+            "params": {}
+          },
+          "WalkerRow": {
+            "translated-name": "WalkerRow",
+            "description": "Current row of the triggering walker. Reads 0 outside walker triggers.",
+            "params": {}
+          },
+          "WalkerStepsLeft": {
+            "translated-name": "WalkerStepsLeft",
+            "description": "Remaining step budget of the triggering walker. Reads 0 outside walker triggers.",
+            "params": {}
+          },
+          "WalkerTag": {
+            "translated-name": "WalkerTag",
+            "description": "Tag of the triggering walker, inside walker triggers and On Cell Carved, or the batch tag inside On Walkers By Tag Complete.",
             "params": {}
           }
         }

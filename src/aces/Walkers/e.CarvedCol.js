@@ -1,13 +1,13 @@
 export const config = {
   highlight: false,
   isDeprecated: false,
-  returnType: "string",
-  description: "Sample Expression",
+  returnType: "number",
+  description: "Column of the cell just written, inside On Cell Carved.",
   params: [],
 };
 
 export const expose = true;
 
 export default function () {
-  return ":)";
+  return this._carvedCol();
 }

@@ -1,15 +1,13 @@
 export const config = {
   highlight: false,
   isDeprecated: false,
-  isTrigger: true,
-  listName: "Sample Trigger",
-  displayText: "Sample Trigger",
-  description: "This is a sample trigger",
+  returnType: "number",
+  description: "Column of the mark just placed, inside On Mark Placed.",
   params: [],
 };
 
 export const expose = true;
 
 export default function () {
-  return true;
+  return this._markCol();
 }

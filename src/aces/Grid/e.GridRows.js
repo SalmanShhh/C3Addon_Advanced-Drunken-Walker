@@ -2,12 +2,12 @@ export const config = {
   highlight: false,
   isDeprecated: false,
   returnType: "number",
-  description: "Sample Expression",
+  description: "Current grid height in cells.",
   params: [],
 };
 
-export const expose = false;
+export const expose = true;
 
 export default function () {
-  return 1002;
+  return this._gridRows();
 }

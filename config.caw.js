@@ -7,14 +7,15 @@ import {
 import _version from "./version.js";
 export const addonType = ADDON_TYPE.PLUGIN;
 export const type = PLUGIN_TYPE.OBJECT;
-export const id = "salmanshh_advanced_drunken_walker";
-export const name = "Advanced Drunken Walker";
+export const id = "salmanshh_advdrunkenwalkers";
+export const name = "Advanced Drunken Walkers";
 export const version = _version;
 export const minConstructVersion = undefined;
 export const author = "SalmanShh";
 export const website = "https://www.construct.net";
 export const documentation = "https://www.construct.net";
-export const description = "-";
+export const description =
+  "Seeded drunkard's-walk generation engine. Carves organic maps with configurable walkers and scatters tagged marks - logic only, you draw the result.";
 export const category = ADDON_CATEGORY.OTHER;
 
 export const hasDomside = false;
@@ -27,23 +28,22 @@ export const files = {
     name: "MyExtension",
   },
   fileDependencies: [],
-  remoteFileDependencies: [
-    // {
-    //   src: "https://example.com/api.js", // Must use https:// or same-protocol // URLs. http:// is not allowed.
-    //   type: "" // Optional: "" or "module". Empty string or omit for classic script.
-    // }
-  ],
+  remoteFileDependencies: [],
   cordovaPluginReferences: [],
   cordovaResourceFiles: [],
 };
 
 // categories that are not filled will use the folder name
-export const aceCategories = {};
+export const aceCategories = {
+  Grid: "Grid",
+  Randomness: "Randomness",
+  Walkers: "Walkers",
+  Marks: "Marks",
+  Post_Processing: "Post-Processing",
+};
 
 export const info = {
-  // icon: "icon.svg",
-  // PLUGIN world only
-  // defaultImageUrl: "default-image.png",
+  icon: "icon.svg",
   Set: {
     // COMMON to all
     CanBeBundled: true,
@@ -65,7 +65,9 @@ export const info = {
     MustPreDraw: false,
 
     // PLUGIN object only
-    IsSingleGlobal: true,
+    // Deliberately false: every instance owns an independent grid, PRNG,
+    // walker set and mark list, so a project can run several generators.
+    IsSingleGlobal: false,
   },
   // PLUGIN only
   AddCommonACEs: {
@@ -78,46 +80,105 @@ export const info = {
   },
 };
 
+// NOTE: property order is the contract - properties are read by index at
+// runtime, so never reorder or remove entries, only append.
 export const properties = [
-  /*
   {
     type: PROPERTY_TYPE.INTEGER,
-    id: "property_id",
+    id: "gridWidth",
+    name: "Grid Width",
+    desc: "Columns created by Create Grid when it is called with a width of 0.",
+    options: {
+      initialValue: 64,
+      minValue: 1,
+    },
+  },
+  {
+    type: PROPERTY_TYPE.INTEGER,
+    id: "gridHeight",
+    name: "Grid Height",
+    desc: "Rows created by Create Grid when it is called with a height of 0.",
+    options: {
+      initialValue: 64,
+      minValue: 1,
+    },
+  },
+  {
+    type: PROPERTY_TYPE.INTEGER,
+    id: "maxGridSize",
+    name: "Max Grid Size",
+    desc: "Hard cap on both axes. Create Grid clamps to this and warns in debug mode - a safety net against runaway expressions.",
+    options: {
+      initialValue: 2048,
+      minValue: 1,
+    },
+  },
+  {
+    type: PROPERTY_TYPE.INTEGER,
+    id: "cellSize",
+    name: "Cell Size",
+    desc: "Pixel size of one cell, used by the cell to layout coordinate expressions.",
+    options: {
+      initialValue: 32,
+      minValue: 1,
+    },
+  },
+  {
+    type: PROPERTY_TYPE.FLOAT,
+    id: "originX",
+    name: "Origin X",
+    desc: "Layout X of the grid's top-left corner, for the coordinate expressions.",
     options: {
       initialValue: 0,
-      interpolatable: false,
-
-      // minValue: 0, // omit to disable
-      // maxValue: 100, // omit to disable
-
-      // for type combo only
-      // items: [
-      //   {itemId1: "item name1" },
-      //   {itemId2: "item name2" },
-      // ],
-
-      // dragSpeedMultiplier: 1, // omit to disable
-
-      // for type object only
-      // allowedPluginIds: ["Sprite", "<world>"],
-
-      // for type link only
-      // linkCallback: function(instOrObj) {},
-      // linkText: "Link Text",
-      // callbackType:
-      //   "for-each-instance"
-      //   "once-for-type"
-
-      // for type info only
-      // infoCallback: function(inst) {},
-
-      // for type projectfile only (plugins only, Addon SDK v2, r426+)
-      // A dropdown list from which any project file in the project can be chosen.
-      // The property value at runtime is a relative path to fetch the project file from.
-      // filter: ".txt", // optional: filter list by file extension (e.g., ".txt" to only list .txt files)
     },
-    name: "Property Name",
-    desc: "Property Description",
-  }
-  */
+  },
+  {
+    type: PROPERTY_TYPE.FLOAT,
+    id: "originY",
+    name: "Origin Y",
+    desc: "Layout Y of the grid's top-left corner, for the coordinate expressions.",
+    options: {
+      initialValue: 0,
+    },
+  },
+  {
+    type: PROPERTY_TYPE.INTEGER,
+    id: "emptyValue",
+    name: "Empty Value",
+    desc: "The value the grid is filled with on creation and by Clear Grid.",
+    options: {
+      initialValue: 0,
+    },
+  },
+  {
+    type: PROPERTY_TYPE.TEXT,
+    id: "seed",
+    name: "Seed",
+    desc: "Initial seed. Leave empty to derive one from the current time (non-deterministic until Set Seed is called).",
+    options: {
+      initialValue: "",
+    },
+  },
+  {
+    type: PROPERTY_TYPE.COMBO,
+    id: "randomSource",
+    name: "Random Source",
+    desc: "Where random values come from: the built-in seeded PRNG, or the queue filled by Inject Random.",
+    options: {
+      initialValue: "internal_seeded",
+      items: [
+        { internal_seeded: "Internal seeded" },
+        { injected: "Injected" },
+      ],
+    },
+  },
+  {
+    type: PROPERTY_TYPE.CHECK,
+    id: "debugMode",
+    name: "Debug Mode",
+    desc: "Log walker lifecycles, re-rolled boundary steps, clamped grid sizes and injected-queue underruns to the browser console.",
+    options: {
+      initialValue: false,
+    },
+  },
 ];
