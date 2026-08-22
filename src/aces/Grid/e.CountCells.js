@@ -3,7 +3,7 @@ export const config = {
   isDeprecated: false,
   returnType: "number",
   description:
-    "Total cells currently holding the value. Pairs with GetCellColByIndex and GetCellRowByIndex to iterate results.",
+    "Total cells currently holding the value. Pairs with GetCellXByIndex and GetCellYByIndex to iterate results.",
   params: [
     {
       id: "value",

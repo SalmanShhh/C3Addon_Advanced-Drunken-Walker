@@ -6,16 +6,16 @@ export const config = {
   description: "True if the coordinates fall within the current grid.",
   params: [
     {
-      id: "col",
-      name: "Column",
-      desc: "Cell column.",
+      id: "x",
+      name: "X",
+      desc: "Cell X, 0 at the left edge.",
       type: "number",
       initialValue: "0",
     },
     {
-      id: "row",
-      name: "Row",
-      desc: "Cell row.",
+      id: "y",
+      name: "Y",
+      desc: "Cell Y, 0 at the top edge.",
       type: "number",
       initialValue: "0",
     },
@@ -24,6 +24,6 @@ export const config = {
 
 export const expose = true;
 
-export default function (col, row) {
-  return this._isInsideGrid(col, row);
+export default function (x, y) {
+  return this._isInsideGrid(x, y);
 }

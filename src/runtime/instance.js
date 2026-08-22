@@ -34,7 +34,7 @@ const PLACEMENT = { ANY: 0, INTERIOR: 1, EDGE: 2 };
 
 // Fallbacks for every optional Walker Definition field. Add Walker fills in
 // what it does not expose from here, and Define Walker falls back to it for
-// anything missing from the JSON. Only id, startCol and startRow have no
+// anything missing from the JSON. Only id, startX and startY have no
 // meaningful default. These numbers are quoted in both ACE descriptions.
 const WALKER_DEFAULTS = {
   steps: 400,
@@ -155,7 +155,7 @@ function packInt32Array(arr) {
   return btoa(binary);
 }
 
-// `length` comes from the saved cols/rows rather than the string, so a
+// `length` comes from the saved width/height rather than the string, so a
 // truncated payload yields a correctly sized grid instead of throwing.
 function unpackInt32Array(str, length) {
   const result = new Int32Array(length);
@@ -174,15 +174,15 @@ export default function (parentClass) {
     constructor() {
       super();
 
-      // --- grid, row-major: index = row * _cols + col ---
-      this._cols = 0;
-      this._rows = 0;
+      // --- grid, one flat buffer: index = y * _width + x ---
+      this._width = 0;
+      this._height = 0;
       this._grid = new Int32Array(0);
       this._emptyValue = 0;
       this._maxGridSize = 2048;
       // Create Grid falls back to these when passed a 0 dimension.
-      this._defaultCols = 64;
-      this._defaultRows = 64;
+      this._defaultWidth = 64;
+      this._defaultHeight = 64;
 
       // --- placement in layout space, for the coordinate expressions ---
       this._cellSize = 32;
@@ -204,7 +204,7 @@ export default function (parentClass) {
       this._walkers = new Map();
       this._marks = []; // placement order, as the Index expressions expose it
       this._marksByTag = new Map(); // tag -> marks, for CountMarks and spacing
-      this._markCells = new Map(); // "col,row" -> marks, for Has Mark At
+      this._markCells = new Map(); // "x,y" -> marks, for Has Mark At
 
       // value -> cell indexes, built on demand by _cellIndex() and
       // invalidated (not rebuilt) on write.
@@ -214,11 +214,11 @@ export default function (parentClass) {
       // Trigger context - assign before _trigger(), never after.
       this._ctxWalker = null;
       this._ctxTag = "";
-      this._ctxCarvedCol = 0;
-      this._ctxCarvedRow = 0;
+      this._ctxCarvedX = 0;
+      this._ctxCarvedY = 0;
       this._ctxCarvedValue = 0;
-      this._ctxMarkCol = 0;
-      this._ctxMarkRow = 0;
+      this._ctxMarkX = 0;
+      this._ctxMarkY = 0;
       this._ctxMarkTag = "";
 
       // Properties are read positionally, which is why config.caw.js warns
@@ -228,11 +228,11 @@ export default function (parentClass) {
       //   8 Random Source   9 Debug Mode
       const properties = this._getInitProperties();
       if (properties) {
-        this._defaultCols = Math.max(
+        this._defaultWidth = Math.max(
           1,
           Math.floor(toNumber(properties[0], 64))
         );
-        this._defaultRows = Math.max(
+        this._defaultHeight = Math.max(
           1,
           Math.floor(toNumber(properties[1], 64))
         );
@@ -257,11 +257,12 @@ export default function (parentClass) {
         this._setSeed("");
       }
 
-      // A grid exists from the start, so CellValue and the conditions are safe
-      // to call before the project has run Create Grid.
+      // The Grid Width / Grid Height properties are built here, so a project
+      // that just wants the property-sized grid never has to call Create Grid
+      // at all - and CellValue and the conditions are safe from the first tick.
       this._allocGrid(
-        Math.min(this._defaultCols, this._maxGridSize),
-        Math.min(this._defaultRows, this._maxGridSize)
+        Math.min(this._defaultWidth, this._maxGridSize),
+        Math.min(this._defaultHeight, this._maxGridSize)
       );
     }
 
@@ -370,10 +371,10 @@ export default function (parentClass) {
     // Grid storage
     // ---------------------------------------------------------------------
 
-    _allocGrid(cols, rows) {
-      this._cols = Math.max(0, Math.floor(cols));
-      this._rows = Math.max(0, Math.floor(rows));
-      this._grid = new Int32Array(this._cols * this._rows);
+    _allocGrid(width, height) {
+      this._width = Math.max(0, Math.floor(width));
+      this._height = Math.max(0, Math.floor(height));
+      this._grid = new Int32Array(this._width * this._height);
       // Typed arrays are already zeroed, so only a non-zero Empty Value costs
       // a pass over the buffer.
       if (this._emptyValue !== 0) this._grid.fill(this._emptyValue);
@@ -381,14 +382,14 @@ export default function (parentClass) {
       this._cellCacheDirty = true;
     }
 
-    _isInside(col, row) {
-      return col >= 0 && row >= 0 && col < this._cols && row < this._rows;
+    _isInside(x, y) {
+      return x >= 0 && y >= 0 && x < this._width && y < this._height;
     }
 
     // Everything outside the grid reads as the Empty Value.
-    _cellAt(col, row) {
-      if (!this._isInside(col, row)) return this._emptyValue;
-      return this._grid[row * this._cols + col];
+    _cellAt(x, y) {
+      if (!this._isInside(x, y)) return this._emptyValue;
+      return this._grid[y * this._width + x];
     }
 
     // The single write path for generated content, and the only place On Cell
@@ -396,15 +397,15 @@ export default function (parentClass) {
     // covered ground stays silent. A null `walker` marks a post-processing
     // write, which is what makes WalkerID read as empty inside those triggers.
     // Set Cell deliberately bypasses this: it is a documented silent write.
-    _carveCell(col, row, value, walker) {
-      if (!this._isInside(col, row)) return false;
-      const index = row * this._cols + col;
+    _carveCell(x, y, value, walker) {
+      if (!this._isInside(x, y)) return false;
+      const index = y * this._width + x;
       if (this._grid[index] === value) return false;
       this._grid[index] = value;
       this._cellCacheDirty = true;
 
-      this._ctxCarvedCol = col;
-      this._ctxCarvedRow = row;
+      this._ctxCarvedX = x;
+      this._ctxCarvedY = y;
       this._ctxCarvedValue = value;
       this._ctxWalker = walker || null;
       this._ctxTag = walker ? walker.tag : "";
@@ -415,33 +416,34 @@ export default function (parentClass) {
     // Off-grid neighbours never match, whatever `value` is. That is what lets
     // the placement rules treat the border as a wall: an edge cell can never
     // be "interior".
-    _countNeighbours(col, row, value) {
+    _countNeighbours(x, y, value) {
       let count = 0;
       for (let i = 0; i < 8; i++) {
-        const c = col + OCTANT_DX[i];
-        const r = row + OCTANT_DY[i];
-        if (!this._isInside(c, r)) continue;
-        if (this._grid[r * this._cols + c] === value) count++;
+        const nx = x + OCTANT_DX[i];
+        const ny = y + OCTANT_DY[i];
+        if (!this._isInside(nx, ny)) continue;
+        if (this._grid[ny * this._width + nx] === value) count++;
       }
       return count;
     }
 
     // Early-out version, for the dilate and outline passes.
-    _hasNeighbour(col, row, value) {
+    _hasNeighbour(x, y, value) {
       for (let i = 0; i < 8; i++) {
-        const c = col + OCTANT_DX[i];
-        const r = row + OCTANT_DY[i];
-        if (!this._isInside(c, r)) continue;
-        if (this._grid[r * this._cols + c] === value) return true;
+        const nx = x + OCTANT_DX[i];
+        const ny = y + OCTANT_DY[i];
+        if (!this._isInside(nx, ny)) continue;
+        if (this._grid[ny * this._width + nx] === value) return true;
       }
       return false;
     }
 
-    // Backs CountCells, GetCell*ByIndex and Scatter Marks. Row-major insertion
-    // gives the stable order those expressions promise. Invalidated rather
-    // than updated on write, so generate-then-iterate costs one scan however
-    // many cells were carved - which is why the ACE descriptions steer users
-    // towards iterating after On Generation Complete.
+    // Backs CountCells, GetCell*ByIndex and Scatter Marks. Scanning the buffer
+    // in order gives the stable left-to-right, top-to-bottom order those
+    // expressions promise. Invalidated rather than updated on write, so
+    // generate-then-iterate costs one scan however many cells were carved -
+    // which is why the ACE descriptions steer users towards iterating after
+    // On Generation Complete.
     _cellIndex() {
       if (this._cellCache && !this._cellCacheDirty) return this._cellCache;
       const map = new Map();
@@ -470,7 +472,7 @@ export default function (parentClass) {
     //
     // A walker is a plain object with three groups of fields: configuration
     // (id..brushSize), derived (headings, octants - precomputed so the step
-    // loop does no trigonometry) and progress (col..path). Save/load persists
+    // loop does no trigonometry) and progress (x..path). Save/load persists
     // the first and third and rebuilds the second via _registerWalker.
     // ---------------------------------------------------------------------
 
@@ -510,8 +512,8 @@ export default function (parentClass) {
         // configuration
         id: walkerId,
         tag: raw.tag === undefined ? WALKER_DEFAULTS.tag : String(raw.tag),
-        startCol: Math.floor(toNumber(raw.startCol, 0)),
-        startRow: Math.floor(toNumber(raw.startRow, 0)),
+        startX: Math.floor(toNumber(raw.startX, 0)),
+        startY: Math.floor(toNumber(raw.startY, 0)),
         steps: Math.max(
           0,
           Math.floor(toNumber(raw.steps, WALKER_DEFAULTS.steps))
@@ -543,20 +545,20 @@ export default function (parentClass) {
 
         // progress. `angle` is always a member of `headings`, which
         // _advanceWalker relies on when looking its index back up.
-        col: 0,
-        row: 0,
+        x: 0,
+        y: 0,
         angle: headings[0],
         stepsLeft: 0,
         started: false,
         finished: false,
-        // Flat [col0, row0, col1, row1, ...] of every cell stood on, start
+        // Flat [x0, y0, x1, y1, ...] of every cell stood on, start
         // included. Flat rather than objects because Drop Marks Along Walk
         // may replay thousands of steps.
         path: [],
       };
 
-      walker.col = walker.startCol;
-      walker.row = walker.startRow;
+      walker.x = walker.startX;
+      walker.y = walker.startY;
       walker.stepsLeft = walker.steps;
 
       // Map.set on an existing key keeps its position, so redefining a walker
@@ -571,8 +573,8 @@ export default function (parentClass) {
     _restoreWalker(saved) {
       const walker = this._registerWalker(saved);
       if (!walker) return;
-      walker.col = Math.floor(toNumber(saved.col, walker.startCol));
-      walker.row = Math.floor(toNumber(saved.row, walker.startRow));
+      walker.x = Math.floor(toNumber(saved.x, walker.startX));
+      walker.y = Math.floor(toNumber(saved.y, walker.startY));
       walker.angle = normAngle(toNumber(saved.angle, walker.startAngle));
       walker.stepsLeft = Math.max(
         0,
@@ -591,13 +593,13 @@ export default function (parentClass) {
     // _carveOrientedBrush.
     //
     // Even sizes cannot truly centre on a square grid, so they extend right
-    // and down: size 2 covers (col, row) to (col + 1, row + 1).
-    _carveBrush(walker, col, row) {
+    // and down: size 2 covers (x, y) to (x + 1, y + 1).
+    _carveBrush(walker, x, y) {
       if (walker.brushWidth !== null || walker.brushHeight !== null) {
         this._carveOrientedBrush(
           walker,
-          col,
-          row,
+          x,
+          y,
           walker.brushWidth === null ? walker.brushSize : walker.brushWidth,
           walker.brushHeight === null ? walker.brushSize : walker.brushHeight
         );
@@ -606,15 +608,15 @@ export default function (parentClass) {
 
       const size = walker.brushSize;
       if (size <= 1) {
-        this._carveCell(col, row, walker.carveValue, walker);
+        this._carveCell(x, y, walker.carveValue, walker);
         return;
       }
       const offset = Math.floor((size - 1) / 2);
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
+      for (let dy = 0; dy < size; dy++) {
+        for (let dx = 0; dx < size; dx++) {
           this._carveCell(
-            col - offset + c,
-            row - offset + r,
+            x - offset + dx,
+            y - offset + dy,
             walker.carveValue,
             walker
           );
@@ -651,7 +653,7 @@ export default function (parentClass) {
     // of a cell at 45 degrees. That is the smallest correction that makes
     // consecutive stamps overlap, and it leaves the across axis alone so the
     // corridor keeps the width that was asked for.
-    _carveOrientedBrush(walker, col, row, width, height) {
+    _carveOrientedBrush(walker, x, y, width, height) {
       const radians = (walker.angle * Math.PI) / 180;
       const forwardX = Math.cos(radians);
       const forwardY = Math.sin(radians); // grid Y grows downward, as 90 = down
@@ -679,13 +681,13 @@ export default function (parentClass) {
       // A rotated rectangle never reaches further than the sum of its sides.
       const reach = span + depth;
 
-      for (let dr = -reach; dr <= reach; dr++) {
-        for (let dc = -reach; dc <= reach; dc++) {
-          const along = dc * forwardX + dr * forwardY;
+      for (let dy = -reach; dy <= reach; dy++) {
+        for (let dx = -reach; dx <= reach; dx++) {
+          const along = dx * forwardX + dy * forwardY;
           if (along < alongMin || along > alongMax) continue;
-          const across = dr * forwardX - dc * forwardY;
+          const across = dy * forwardX - dx * forwardY;
           if (across < acrossMin || across > acrossMax) continue;
-          this._carveCell(col + dc, row + dr, walker.carveValue, walker);
+          this._carveCell(x + dx, y + dy, walker.carveValue, walker);
         }
       }
     }
@@ -696,8 +698,8 @@ export default function (parentClass) {
     _beginWalker(walker) {
       if (walker.started) return;
       walker.started = true;
-      walker.path.push(walker.col, walker.row);
-      this._carveBrush(walker, walker.col, walker.row);
+      walker.path.push(walker.x, walker.y);
+      this._carveBrush(walker, walker.x, walker.y);
     }
 
     _finishWalker(walker) {
@@ -706,13 +708,13 @@ export default function (parentClass) {
       this._ctxWalker = walker;
       this._ctxTag = walker.tag;
       this._trigger("OnWalkerFinished");
-      this._log("walker finished", walker.id, walker.col, walker.row);
+      this._log("walker finished", walker.id, walker.x, walker.y);
     }
 
     // Where heading index `headingIndex` would put the walker next.
     _stepDestination(walker, headingIndex) {
       const octant = walker.octants[headingIndex];
-      return [walker.col + OCTANT_DX[octant], walker.row + OCTANT_DY[octant]];
+      return [walker.x + OCTANT_DX[octant], walker.y + OCTANT_DY[octant]];
     }
 
     // One step. Returns false once the walker is done - budget exhausted or
@@ -750,9 +752,9 @@ export default function (parentClass) {
         }
       }
 
-      let [col, row] = this._stepDestination(walker, chosen);
+      let [x, y] = this._stepDestination(walker, chosen);
 
-      if (!this._isInside(col, row)) {
+      if (!this._isInside(x, y)) {
         // Borders repel rather than trap: re-roll among the legal headings,
         // widening to the full direction set when every reachable one is
         // blocked (which is how a walker escapes a corner).
@@ -773,16 +775,16 @@ export default function (parentClass) {
           return false;
         }
         chosen = this._pickHeading(walker, legal);
-        [col, row] = this._stepDestination(walker, chosen);
+        [x, y] = this._stepDestination(walker, chosen);
         this._log("boundary re-roll", walker.id, "to", headings[chosen]);
       }
 
       walker.angle = headings[chosen];
-      walker.col = col;
-      walker.row = row;
+      walker.x = x;
+      walker.y = y;
       walker.stepsLeft--;
-      walker.path.push(col, row);
-      this._carveBrush(walker, col, row);
+      walker.path.push(x, y);
+      this._carveBrush(walker, x, y);
       return true;
     }
 
@@ -822,18 +824,18 @@ export default function (parentClass) {
     // ---------------------------------------------------------------------
     // Marks
     //
-    // A mark is just {col, row, tag}. _marks is the source of truth and
+    // A mark is just {x, y, tag}. _marks is the source of truth and
     // _marksByTag / _markCells are indexes over it - add to all three in
     // _addMark, drop all three in _clearAllMarks, and keep Clear Marks in
     // sync when it removes a single tag.
     // ---------------------------------------------------------------------
 
-    _markCellKey(col, row) {
-      return col + "," + row;
+    _markCellKey(x, y) {
+      return x + "," + y;
     }
 
-    _addMark(col, row, tag) {
-      const mark = { col, row, tag };
+    _addMark(x, y, tag) {
+      const mark = { x, y, tag };
       this._marks.push(mark);
 
       let byTag = this._marksByTag.get(tag);
@@ -843,7 +845,7 @@ export default function (parentClass) {
       }
       byTag.push(mark);
 
-      const key = this._markCellKey(col, row);
+      const key = this._markCellKey(x, y);
       let atCell = this._markCells.get(key);
       if (!atCell) {
         atCell = [];
@@ -851,8 +853,8 @@ export default function (parentClass) {
       }
       atCell.push(mark);
 
-      this._ctxMarkCol = col;
-      this._ctxMarkRow = row;
+      this._ctxMarkX = x;
+      this._ctxMarkY = y;
       this._ctxMarkTag = tag;
       this._trigger("OnMarkPlaced");
     }
@@ -867,36 +869,36 @@ export default function (parentClass) {
       const minSq = min * min;
       const buckets = new Map();
 
-      const add = (col, row) => {
-        const key = Math.floor(col / size) + "," + Math.floor(row / size);
+      const add = (x, y) => {
+        const key = Math.floor(x / size) + "," + Math.floor(y / size);
         let list = buckets.get(key);
         if (!list) {
           list = [];
           buckets.set(key, list);
         }
-        list.push(col, row);
+        list.push(x, y);
       };
 
       const existing = this._marksByTag.get(tag);
       if (existing) {
-        for (const mark of existing) add(mark.col, mark.row);
+        for (const mark of existing) add(mark.x, mark.y);
       }
 
       // Bucket size is the spacing radius, so any mark close enough to matter
       // is in one of the 9 buckets around the candidate.
-      const accepts = (col, row) => {
-        const bc = Math.floor(col / size);
-        const br = Math.floor(row / size);
-        for (let dr = -1; dr <= 1; dr++) {
-          for (let dc = -1; dc <= 1; dc++) {
-            const list = buckets.get(bc + dc + "," + (br + dr));
+      const accepts = (x, y) => {
+        const bx = Math.floor(x / size);
+        const by = Math.floor(y / size);
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const list = buckets.get(bx + dx + "," + (by + dy));
             if (!list) continue;
             for (let i = 0; i < list.length; i += 2) {
-              const ddc = list[i] - col;
-              const ddr = list[i + 1] - row;
+              const ddx = list[i] - x;
+              const ddy = list[i + 1] - y;
               // Two same-tag marks never stack, whatever the spacing.
-              if (ddc === 0 && ddr === 0) return false;
-              if (minSq > 0 && ddc * ddc + ddr * ddr < minSq) return false;
+              if (ddx === 0 && ddy === 0) return false;
+              if (minSq > 0 && ddx * ddx + ddy * ddy < minSq) return false;
             }
           }
         }
@@ -909,9 +911,9 @@ export default function (parentClass) {
     // Placement filter for Scatter Marks. Interior wants all 8 neighbours
     // matching (open ground), edge wants at least one that does not (a wall
     // or the grid border).
-    _placementOk(col, row, cellValue, placement) {
+    _placementOk(x, y, cellValue, placement) {
       if (placement === PLACEMENT.ANY) return true;
-      const matching = this._countNeighbours(col, row, cellValue);
+      const matching = this._countNeighbours(x, y, cellValue);
       if (placement === PLACEMENT.INTERIOR) return matching === 8;
       return matching < 8;
     }
@@ -939,8 +941,8 @@ export default function (parentClass) {
     // map empty": seed set after generation, walkers registered but never run.
     _getDebuggerProperties() {
       const gridProps = [
-        { name: "$gridCols", value: this._cols },
-        { name: "$gridRows", value: this._rows },
+        { name: "$gridWidth", value: this._width },
+        { name: "$gridHeight", value: this._height },
         { name: "$emptyValue", value: this._emptyValue },
         { name: "$seed", value: this._seed },
         {
@@ -971,10 +973,10 @@ export default function (parentClass) {
         walkerProps.push({
           name: "$" + walker.id,
           value:
-            "col " +
-            walker.col +
-            ", row " +
-            walker.row +
+            "x " +
+            walker.x +
+            ", y " +
+            walker.y +
             ", angle " +
             walker.angle +
             ", steps left " +
@@ -1007,8 +1009,8 @@ export default function (parentClass) {
         walkers.push({
           id: walker.id,
           tag: walker.tag,
-          startCol: walker.startCol,
-          startRow: walker.startRow,
+          startX: walker.startX,
+          startY: walker.startY,
           steps: walker.steps,
           directions: walker.directions,
           maxTurn: walker.maxTurn,
@@ -1019,8 +1021,8 @@ export default function (parentClass) {
           brushWidth: walker.brushWidth,
           brushHeight: walker.brushHeight,
           weights: walker.weights,
-          col: walker.col,
-          row: walker.row,
+          x: walker.x,
+          y: walker.y,
           angle: walker.angle,
           stepsLeft: walker.stepsLeft,
           started: walker.started,
@@ -1030,8 +1032,8 @@ export default function (parentClass) {
       }
 
       return {
-        cols: this._cols,
-        rows: this._rows,
+        width: this._width,
+        height: this._height,
         emptyValue: this._emptyValue,
         maxGridSize: this._maxGridSize,
         cellSize: this._cellSize,
@@ -1046,14 +1048,14 @@ export default function (parentClass) {
         grid: packInt32Array(this._grid),
         walkers,
         // Compact tuples: mark lists get long and this is JSON on disk.
-        marks: this._marks.map((mark) => [mark.col, mark.row, mark.tag]),
+        marks: this._marks.map((mark) => [mark.x, mark.y, mark.tag]),
       };
     }
 
     _loadFromJson(o) {
       if (!o) return;
-      this._cols = Math.max(0, Math.floor(toNumber(o.cols, 0)));
-      this._rows = Math.max(0, Math.floor(toNumber(o.rows, 0)));
+      this._width = Math.max(0, Math.floor(toNumber(o.width, 0)));
+      this._height = Math.max(0, Math.floor(toNumber(o.height, 0)));
       this._emptyValue = Math.floor(toNumber(o.emptyValue, 0)) | 0;
       this._maxGridSize = Math.max(
         1,
@@ -1072,7 +1074,7 @@ export default function (parentClass) {
       this._injectedIndex = 0;
       this._debug = !!o.debug;
 
-      this._grid = unpackInt32Array(o.grid, this._cols * this._rows);
+      this._grid = unpackInt32Array(o.grid, this._width * this._height);
       this._cellCache = null;
       this._cellCacheDirty = true;
 
@@ -1086,7 +1088,7 @@ export default function (parentClass) {
       this._clearAllMarks();
       if (Array.isArray(o.marks)) {
         for (const entry of o.marks) {
-          const mark = { col: entry[0], row: entry[1], tag: entry[2] };
+          const mark = { x: entry[0], y: entry[1], tag: entry[2] };
           this._marks.push(mark);
           let byTag = this._marksByTag.get(mark.tag);
           if (!byTag) {
@@ -1094,7 +1096,7 @@ export default function (parentClass) {
             this._marksByTag.set(mark.tag, byTag);
           }
           byTag.push(mark);
-          const key = this._markCellKey(mark.col, mark.row);
+          const key = this._markCellKey(mark.x, mark.y);
           let atCell = this._markCells.get(key);
           if (!atCell) {
             atCell = [];
@@ -1120,38 +1122,42 @@ export default function (parentClass) {
 
     // --- Grid ------------------------------------------------------------
 
-    // Create Grid. A 0 (or invalid) dimension falls back to the property
-    // default; anything over Max Grid Size is clamped rather than allocated.
+    // One Create Grid dimension. A negative asks for the property default on
+    // purpose and is silent; 0 or junk is a mistake, so it warns and falls back
+    // to the same default rather than allocating an unusable empty grid.
+    // Anything over Max Grid Size is clamped instead of allocated.
+    _resolveGridExtent(raw, propertyDefault, label) {
+      const n = Math.floor(Number(raw));
+
+      if (!Number.isFinite(n) || n === 0) {
+        this._warn(
+          "Create Grid got a " + label + " of",
+          raw,
+          "- using the property default",
+          propertyDefault,
+          "(pass a negative to ask for the property on purpose)"
+        );
+        return Math.min(propertyDefault, this._maxGridSize);
+      }
+      if (n < 0) return Math.min(propertyDefault, this._maxGridSize);
+      if (n > this._maxGridSize) {
+        this._warn("clamping grid " + label, n, "to", this._maxGridSize);
+        return this._maxGridSize;
+      }
+      return n;
+    }
+
+    // Create Grid. Only needed when the project wants a size other than the
+    // Grid Width / Grid Height properties, which are already built in the
+    // constructor. Destroys any previous grid, walkers and marks.
     _createGrid(width, height) {
-      let cols = Math.floor(Number(width));
-      let rows = Math.floor(Number(height));
-
-      if (!Number.isFinite(cols) || cols <= 0) {
-        if (Number.isFinite(cols) && cols < 0) {
-          this._warn("Create Grid got a negative width, using the default");
-        }
-        cols = this._defaultCols;
-      }
-      if (!Number.isFinite(rows) || rows <= 0) {
-        if (Number.isFinite(rows) && rows < 0) {
-          this._warn("Create Grid got a negative height, using the default");
-        }
-        rows = this._defaultRows;
-      }
-
-      if (cols > this._maxGridSize) {
-        this._warn("clamping grid width", cols, "to", this._maxGridSize);
-        cols = this._maxGridSize;
-      }
-      if (rows > this._maxGridSize) {
-        this._warn("clamping grid height", rows, "to", this._maxGridSize);
-        rows = this._maxGridSize;
-      }
+      const w = this._resolveGridExtent(width, this._defaultWidth, "width");
+      const h = this._resolveGridExtent(height, this._defaultHeight, "height");
 
       this._walkers.clear();
       this._clearAllMarks();
-      this._allocGrid(cols, rows);
-      this._log("created grid", cols, "x", rows);
+      this._allocGrid(w, h);
+      this._log("created grid", w, "x", h);
     }
 
     // Clear Grid. Deliberately does not touch walkers, marks or the PRNG.
@@ -1161,11 +1167,11 @@ export default function (parentClass) {
     }
 
     // Set Cell. A silent write - see the note on _carveCell.
-    _setCell(col, row, value) {
-      const c = Math.floor(Number(col));
-      const r = Math.floor(Number(row));
-      if (!this._isInside(c, r)) return;
-      this._grid[r * this._cols + c] = Math.floor(Number(value)) | 0;
+    _setCell(x, y, value) {
+      const cx = Math.floor(Number(x));
+      const cy = Math.floor(Number(y));
+      if (!this._isInside(cx, cy)) return;
+      this._grid[cy * this._width + cx] = Math.floor(Number(value)) | 0;
       this._cellCacheDirty = true;
     }
 
@@ -1180,78 +1186,80 @@ export default function (parentClass) {
     }
 
     // Is Cell Value. Out-of-bounds cells match nothing, not even Empty Value.
-    _isCellValue(col, row, value) {
-      const c = Math.floor(Number(col));
-      const r = Math.floor(Number(row));
-      if (!this._isInside(c, r)) return false;
-      return this._grid[r * this._cols + c] === (Math.floor(Number(value)) | 0);
+    _isCellValue(x, y, value) {
+      const cx = Math.floor(Number(x));
+      const cy = Math.floor(Number(y));
+      if (!this._isInside(cx, cy)) return false;
+      return (
+        this._grid[cy * this._width + cx] === (Math.floor(Number(value)) | 0)
+      );
     }
 
     // Is Inside Grid.
-    _isInsideGrid(col, row) {
-      return this._isInside(Math.floor(Number(col)), Math.floor(Number(row)));
+    _isInsideGrid(x, y) {
+      return this._isInside(Math.floor(Number(x)), Math.floor(Number(y)));
     }
 
     // CellValue.
-    _cellValue(col, row) {
-      return this._cellAt(Math.floor(Number(col)), Math.floor(Number(row)));
+    _cellValue(x, y) {
+      return this._cellAt(Math.floor(Number(x)), Math.floor(Number(y)));
     }
 
-    // GridCols / GridRows.
-    _gridCols() {
-      return this._cols;
+    // GridWidth / GridHeight.
+    _gridWidth() {
+      return this._width;
     }
 
-    _gridRows() {
-      return this._rows;
+    _gridHeight() {
+      return this._height;
     }
 
     // NeighbourCount.
-    _neighbourCount(col, row, value) {
+    _neighbourCount(x, y, value) {
       return this._countNeighbours(
-        Math.floor(Number(col)),
-        Math.floor(Number(row)),
+        Math.floor(Number(x)),
+        Math.floor(Number(y)),
         Math.floor(Number(value)) | 0
       );
     }
 
     // CellToLayoutX / CellToLayoutY - centre of the cell in layout space.
-    _cellToLayoutX(col) {
-      return this._originX + (Number(col) + 0.5) * this._cellSize;
+    _cellToLayoutX(x) {
+      return this._originX + (Number(x) + 0.5) * this._cellSize;
     }
 
-    _cellToLayoutY(row) {
-      return this._originY + (Number(row) + 0.5) * this._cellSize;
+    _cellToLayoutY(y) {
+      return this._originY + (Number(y) + 0.5) * this._cellSize;
     }
 
-    // LayoutToCol / LayoutToRow. May return coordinates outside the grid.
-    _layoutToCol(x) {
+    // LayoutToX / LayoutToY. May return coordinates outside the grid.
+    _layoutToX(x) {
       return Math.floor((Number(x) - this._originX) / this._cellSize);
     }
 
-    _layoutToRow(y) {
+    _layoutToY(y) {
       return Math.floor((Number(y) - this._originY) / this._cellSize);
     }
 
-    // CountCells / GetCellColByIndex / GetCellRowByIndex - the iteration
-    // trio, all reading the same stable row-major index.
+    // CountCells / GetCellXByIndex / GetCellYByIndex - the iteration
+    // trio, all reading the same stable left-to-right, top-to-bottom index.
     _countCells(value) {
       const list = this._cellsWithValue(Math.floor(Number(value)) | 0);
       return list ? list.length : 0;
     }
 
-    _getCellColByIndex(value, index) {
+    _getCellXByIndex(value, index) {
       const list = this._cellsWithValue(Math.floor(Number(value)) | 0);
       const i = Math.floor(Number(index));
       if (!list || i < 0 || i >= list.length) return -1;
-      return list[i] % this._cols;
+      return list[i] % this._width;
     }
 
-    _getCellRowByIndex(value, index) {
+    _getCellYByIndex(value, index) {
       const list = this._cellsWithValue(Math.floor(Number(value)) | 0);
       const i = Math.floor(Number(index));
       if (!list || i < 0 || i >= list.length) return -1;
-      return Math.floor(list[i] / this._cols);
+      return Math.floor(list[i] / this._width);
     }
 
     // --- Randomness ------------------------------------------------------
@@ -1291,15 +1299,25 @@ export default function (parentClass) {
     // --- Walkers ---------------------------------------------------------
 
     // Add Walker - the common fields; the rest take WALKER_DEFAULTS.
-    _addWalker(walkerId, startCol, startRow, steps, directions, maxTurn, tag) {
+    _addWalker(
+      walkerId,
+      startX,
+      startY,
+      steps,
+      directions,
+      maxTurn,
+      tag,
+      carveValue
+    ) {
       this._registerWalker({
         id: walkerId,
-        startCol,
-        startRow,
+        startX,
+        startY,
         steps,
         directions,
         maxTurn,
         tag,
+        carveValue,
       });
     }
 
@@ -1350,6 +1368,19 @@ export default function (parentClass) {
         "x",
         walker.brushHeight === null ? "brush" : walker.brushHeight
       );
+    }
+
+    // Set Walker Carve Value. Applies from the walker's next carve onwards,
+    // so cells it has already written keep the value they were given - which
+    // is what lets one walker lay down two values along a single path.
+    _setWalkerCarveValue(walkerId, value) {
+      const walker = this._walkers.get(String(walkerId));
+      if (!walker) {
+        this._warn("Set Walker Carve Value: no walker", walkerId);
+        return;
+      }
+      walker.carveValue = Math.floor(toNumber(value, walker.carveValue)) | 0;
+      this._log("walker", walker.id, "carve value", walker.carveValue);
     }
 
     // Remove Walker. Cells it already carved are left alone.
@@ -1432,12 +1463,12 @@ export default function (parentClass) {
 
     // Walker and carve context expressions. All read as 0 or "" outside their
     // own triggers, by design.
-    _walkerCol() {
-      return this._ctxWalker ? this._ctxWalker.col : 0;
+    _walkerX() {
+      return this._ctxWalker ? this._ctxWalker.x : 0;
     }
 
-    _walkerRow() {
-      return this._ctxWalker ? this._ctxWalker.row : 0;
+    _walkerY() {
+      return this._ctxWalker ? this._ctxWalker.y : 0;
     }
 
     _walkerAngle() {
@@ -1458,12 +1489,12 @@ export default function (parentClass) {
       return this._ctxWalker ? this._ctxWalker.tag : this._ctxTag;
     }
 
-    _carvedCol() {
-      return this._ctxCarvedCol;
+    _carvedX() {
+      return this._ctxCarvedX;
     }
 
-    _carvedRow() {
-      return this._ctxCarvedRow;
+    _carvedY() {
+      return this._ctxCarvedY;
     }
 
     _carvedValue() {
@@ -1492,14 +1523,14 @@ export default function (parentClass) {
       // Starts at `stride`, so the start cell is not automatically a
       // candidate - the first mark lands after N steps of walking.
       for (let step = stride; step < stepCount; step += stride) {
-        const col = path[step * 2];
-        const row = path[step * 2 + 1];
+        const x = path[step * 2];
+        const y = path[step * 2 + 1];
         // Drawn for every candidate whatever the chance, so tuning the
         // number does not shift the rest of the stream.
         if (this._random() >= keepChance) continue;
-        if (!spacer.accepts(col, row)) continue;
-        spacer.add(col, row);
-        this._addMark(col, row, markTag);
+        if (!spacer.accepts(x, y)) continue;
+        spacer.add(x, y);
+        this._addMark(x, y, markTag);
       }
     }
 
@@ -1521,13 +1552,13 @@ export default function (parentClass) {
         return;
       }
 
-      const cols = this._cols;
+      const width = this._width;
       const eligible = [];
       for (let i = 0; i < cells.length; i++) {
         const index = cells[i];
-        const col = index % cols;
-        const row = Math.floor(index / cols);
-        if (this._placementOk(col, row, value, rule)) eligible.push(index);
+        const x = index % width;
+        const y = Math.floor(index / width);
+        if (this._placementOk(x, y, value, rule)) eligible.push(index);
       }
 
       const spacer = this._makeSpacer(markTag, minSpacing);
@@ -1542,11 +1573,11 @@ export default function (parentClass) {
         eligible[j] = swap;
 
         const index = eligible[i];
-        const col = index % cols;
-        const row = Math.floor(index / cols);
-        if (!spacer.accepts(col, row)) continue;
-        spacer.add(col, row);
-        this._addMark(col, row, markTag);
+        const x = index % width;
+        const y = Math.floor(index / width);
+        if (!spacer.accepts(x, y)) continue;
+        spacer.add(x, y);
+        this._addMark(x, y, markTag);
         placed++;
       }
 
@@ -1582,10 +1613,10 @@ export default function (parentClass) {
     }
 
     // Has Mark At. An empty tag matches any mark.
-    _hasMarkAt(col, row, tag) {
+    _hasMarkAt(x, y, tag) {
       const key = this._markCellKey(
-        Math.floor(Number(col)),
-        Math.floor(Number(row))
+        Math.floor(Number(x)),
+        Math.floor(Number(y))
       );
       const list = this._markCells.get(key);
       if (!list || list.length === 0) return false;
@@ -1613,27 +1644,27 @@ export default function (parentClass) {
       return list ? list.length : 0;
     }
 
-    _getMarkColByIndex(tag, index) {
+    _getMarkXByIndex(tag, index) {
       const list = this._markListFor(tag);
       const i = Math.floor(Number(index));
       if (!list || i < 0 || i >= list.length) return -1;
-      return list[i].col;
+      return list[i].x;
     }
 
-    _getMarkRowByIndex(tag, index) {
+    _getMarkYByIndex(tag, index) {
       const list = this._markListFor(tag);
       const i = Math.floor(Number(index));
       if (!list || i < 0 || i >= list.length) return -1;
-      return list[i].row;
+      return list[i].y;
     }
 
     // Mark context expressions, valid inside On Mark Placed.
-    _markCol() {
-      return this._ctxMarkCol;
+    _markX() {
+      return this._ctxMarkX;
     }
 
-    _markRow() {
-      return this._ctxMarkRow;
+    _markY() {
+      return this._ctxMarkY;
     }
 
     _markTag() {
@@ -1649,17 +1680,17 @@ export default function (parentClass) {
       const passes = Math.floor(Number(iterations));
       if (!Number.isFinite(passes) || passes <= 0) return;
 
-      const cols = this._cols;
-      const rows = this._rows;
+      const width = this._width;
+      const height = this._height;
 
       for (let pass = 0; pass < passes; pass++) {
         // Collected from a snapshot first, otherwise one iteration would
         // smear across the grid in the scan direction.
         const pending = [];
-        for (let row = 0; row < rows; row++) {
-          for (let col = 0; col < cols; col++) {
-            if (this._grid[row * cols + col] === target) continue;
-            if (this._hasNeighbour(col, row, target)) pending.push(col, row);
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            if (this._grid[y * width + x] === target) continue;
+            if (this._hasNeighbour(x, y, target)) pending.push(x, y);
           }
         }
         if (pending.length === 0) break;
@@ -1674,14 +1705,14 @@ export default function (parentClass) {
     _outlineCells(value, outlineValue) {
       const target = Math.floor(Number(value)) | 0;
       const outline = Math.floor(Number(outlineValue)) | 0;
-      const cols = this._cols;
-      const rows = this._rows;
+      const width = this._width;
+      const height = this._height;
 
       const pending = [];
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          if (this._grid[row * cols + col] !== this._emptyValue) continue;
-          if (this._hasNeighbour(col, row, target)) pending.push(col, row);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          if (this._grid[y * width + x] !== this._emptyValue) continue;
+          if (this._hasNeighbour(x, y, target)) pending.push(x, y);
         }
       }
 

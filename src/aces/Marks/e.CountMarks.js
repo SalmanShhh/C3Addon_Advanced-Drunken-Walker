@@ -3,7 +3,7 @@ export const config = {
   isDeprecated: false,
   returnType: "number",
   description:
-    "Marks with the tag. An empty tag counts every mark. Pairs with GetMarkColByIndex and GetMarkRowByIndex to iterate results.",
+    "Marks with the tag. An empty tag counts every mark. Pairs with GetMarkXByIndex and GetMarkYByIndex to iterate results.",
   params: [
     {
       id: "tag",

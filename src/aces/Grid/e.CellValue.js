@@ -5,13 +5,13 @@ export const config = {
   description:
     "Value at the cell. Returns the Empty Value for out-of-bounds queries.",
   params: [
-    { id: "col", name: "Column", desc: "Cell column.", type: "number" },
-    { id: "row", name: "Row", desc: "Cell row.", type: "number" },
+    { id: "x", name: "X", desc: "Cell X, 0 at the left edge.", type: "number" },
+    { id: "y", name: "Y", desc: "Cell Y, 0 at the top edge.", type: "number" },
   ],
 };
 
 export const expose = true;
 
-export default function (col, row) {
-  return this._cellValue(col, row);
+export default function (x, y) {
+  return this._cellValue(x, y);
 }

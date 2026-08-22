@@ -87,7 +87,7 @@ export const properties = [
     type: PROPERTY_TYPE.INTEGER,
     id: "gridWidth",
     name: "Grid Width",
-    desc: "Columns created by Create Grid when it is called with a width of 0.",
+    desc: "Grid width in cells. The grid is built at this size automatically when the layout starts - Create Grid is only needed for a different size.",
     options: {
       initialValue: 64,
       minValue: 1,
@@ -97,7 +97,7 @@ export const properties = [
     type: PROPERTY_TYPE.INTEGER,
     id: "gridHeight",
     name: "Grid Height",
-    desc: "Rows created by Create Grid when it is called with a height of 0.",
+    desc: "Grid height in cells. The grid is built at this size automatically when the layout starts - Create Grid is only needed for a different size.",
     options: {
       initialValue: 64,
       minValue: 1,

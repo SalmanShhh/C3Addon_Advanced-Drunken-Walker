@@ -4,9 +4,9 @@ export const config = {
   isAsync: false,
   listName: "Add walker",
   displayText:
-    "{my} add walker [b]{0}[/b] at ([i]{1}[/i], [i]{2}[/i]), [i]{3}[/i] steps, [i]{4}[/i] directions, max turn [i]{5}[/i], tag [i]{6}[/i]",
+    "{my} add walker [b]{0}[/b] at ([i]{1}[/i], [i]{2}[/i]), [i]{3}[/i] steps, [i]{4}[/i] directions, max turn [i]{5}[/i], tag [i]{6}[/i], carving [i]{7}[/i]",
   description:
-    "Register a walker with the given core settings. Remaining fields use the Walker Definition defaults. Walkers run in registration order.",
+    "Register a walker with the given core settings, including the value it carves. Remaining fields use the Walker Definition defaults. Walkers run in registration order.",
   params: [
     {
       id: "walkerId",
@@ -16,16 +16,16 @@ export const config = {
       initialValue: '"main"',
     },
     {
-      id: "startCol",
-      name: "Start Column",
-      desc: "Starting cell column.",
+      id: "startX",
+      name: "Start X",
+      desc: "Starting cell X, 0 at the left edge.",
       type: "number",
       initialValue: "0",
     },
     {
-      id: "startRow",
-      name: "Start Row",
-      desc: "Starting cell row.",
+      id: "startY",
+      name: "Start Y",
+      desc: "Starting cell Y, 0 at the top edge.",
       type: "number",
       initialValue: "0",
     },
@@ -57,19 +57,36 @@ export const config = {
       type: "string",
       initialValue: '""',
     },
+    {
+      id: "carveValue",
+      name: "Carve Value",
+      desc: "The integer this walker writes into every cell it visits. Give each walker its own value to layer floors, water, ore and decoration in one grid, then read them back per value.",
+      type: "number",
+      initialValue: "1",
+    },
   ],
 };
 
 export const expose = true;
 
-export default function (walkerId, startCol, startRow, steps, directions, maxTurn, tag) {
+export default function (
+  walkerId,
+  startX,
+  startY,
+  steps,
+  directions,
+  maxTurn,
+  tag,
+  carveValue
+) {
   this._addWalker(
     walkerId,
-    startCol,
-    startRow,
+    startX,
+    startY,
     steps,
     directions,
     maxTurn,
-    tag
+    tag,
+    carveValue
   );
 }

@@ -5,7 +5,7 @@ export const config = {
   listName: "On mark placed",
   displayText: "On [i]{0}[/i] mark placed",
   description:
-    "Fires once per mark from Drop Marks Along Walk and Scatter Marks. Use MarkCol, MarkRow and MarkTag inside. An empty filter matches all tags.",
+    "Fires once per mark from Drop Marks Along Walk and Scatter Marks. Use MarkX, MarkY and MarkTag inside. An empty filter matches all tags.",
   params: [
     {
       id: "tag",

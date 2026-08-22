@@ -3,7 +3,7 @@ export const config = {
   isDeprecated: false,
   returnType: "number",
   description:
-    "Row of the index-th mark with the tag, 0-based in placement order. Returns -1 when out of range.",
+    "Y of the index-th mark with the tag, 0-based in placement order. Returns -1 when out of range.",
   params: [
     {
       id: "tag",
@@ -18,5 +18,5 @@ export const config = {
 export const expose = true;
 
 export default function (tag, index) {
-  return this._getMarkRowByIndex(tag, index);
+  return this._getMarkYByIndex(tag, index);
 }

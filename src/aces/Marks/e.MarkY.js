@@ -2,12 +2,12 @@ export const config = {
   highlight: false,
   isDeprecated: false,
   returnType: "number",
-  description: "Row of the cell just written, inside On Cell Carved.",
+  description: "Y of the mark just placed, inside On Mark Placed.",
   params: [],
 };
 
 export const expose = true;
 
 export default function () {
-  return this._carvedRow();
+  return this._markY();
 }

@@ -7,16 +7,16 @@ export const config = {
     "True if the cell holds exactly the given value. Out-of-bounds cells match nothing.",
   params: [
     {
-      id: "col",
-      name: "Column",
-      desc: "Cell column.",
+      id: "x",
+      name: "X",
+      desc: "Cell X, 0 at the left edge.",
       type: "number",
       initialValue: "0",
     },
     {
-      id: "row",
-      name: "Row",
-      desc: "Cell row.",
+      id: "y",
+      name: "Y",
+      desc: "Cell Y, 0 at the top edge.",
       type: "number",
       initialValue: "0",
     },
@@ -32,6 +32,6 @@ export const config = {
 
 export const expose = true;
 
-export default function (col, row, value) {
-  return this._isCellValue(col, row, value);
+export default function (x, y, value) {
+  return this._isCellValue(x, y, value);
 }

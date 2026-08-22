@@ -3,12 +3,12 @@ export const config = {
   isDeprecated: false,
   returnType: "number",
   description:
-    "Column containing the layout X coordinate. May fall outside the grid.",
+    "Cell X containing the layout X coordinate. May fall outside the grid.",
   params: [{ id: "x", name: "X", desc: "Layout X coordinate.", type: "number" }],
 };
 
 export const expose = true;
 
 export default function (x) {
-  return this._layoutToCol(x);
+  return this._layoutToX(x);
 }

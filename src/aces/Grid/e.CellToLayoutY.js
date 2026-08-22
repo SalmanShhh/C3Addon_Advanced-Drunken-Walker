@@ -3,11 +3,11 @@ export const config = {
   isDeprecated: false,
   returnType: "number",
   description: "Layout Y of the cell's centre, from Origin Y and Cell Size.",
-  params: [{ id: "row", name: "Row", desc: "Cell row.", type: "number" }],
+  params: [{ id: "y", name: "Y", desc: "Cell Y, 0 at the top edge.", type: "number" }],
 };
 
 export const expose = true;
 
-export default function (row) {
-  return this._cellToLayoutY(row);
+export default function (y) {
+  return this._cellToLayoutY(y);
 }

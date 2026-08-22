@@ -8,5 +8,15 @@
     "added": "initial release",
     "changed": "",
     "fixed": ""
+  },
+  "2.0.0.0": {
+    "added": "Create Grid now takes a negative width or height to mean \"use the Grid Width / Grid Height property\". The property-sized grid is still built automatically when the layout starts, so Create Grid is only needed for a different size. Add Walker now takes a Carve Value, so a walker can write any integer without dropping to a Define Walker JSON string, and the new Set Walker Carve Value action changes it on an existing walker - from On Walker Stepped it lets one walker lay down two materials along a single path.",
+    "changed": "BREAKING: column/row wording is gone from the whole API. Grid size expressions are now GridWidth and GridHeight; every cell coordinate is X/Y - GetCellXByIndex, GetCellYByIndex, LayoutToX, LayoutToY, MarkX, MarkY, GetMarkXByIndex, GetMarkYByIndex, CarvedX, CarvedY, WalkerX, WalkerY. Action and condition parameters are renamed to X and Y (Add Walker takes Start X and Start Y), the Walker Definition JSON uses startX and startY, and savegames written by 1.0.0.0 no longer load.",
+    "fixed": "Create Grid no longer treats a width or height of 0 as a silent request for the property default; it warns and falls back instead of leaving an unusable grid."
+  },
+  "1.1.0.0": {
+    "added": "- Carve Value parameter on Add Walker (default 1), so a walker can write any integer without a Define Walker JSON string.\n- New action Set walker carve value (ID, Carve Value), which applies from the walker's next step so already carved cells keep their old value.\n- Create Grid accepts a negative width or height to mean \"use the Grid Width / Grid Height property\".",
+    "changed": "- Grid size expressions: GridCols / GridRows are now GridWidth / GridHeight.\n- Cell coordinates are X/Y everywhere: GetCellXByIndex, GetCellYByIndex, LayoutToX, LayoutToY, MarkX, MarkY, GetMarkXByIndex, GetMarkYByIndex, CarvedX, CarvedY, WalkerX, WalkerY.\n- Action and condition params renamed to X and Y; Add Walker takes Start X and Start Y.\n- Walker Definition JSON uses startX and startY.\n- Docs now state that the property sized grid is built automatically at startup, so Create Grid is only needed for a different size.",
+    "fixed": "- Create Grid no longer treats 0 as a silent request for the property default. It warns in debug mode and falls back, instead of leaving an unusable empty grid.\n"
   }
 }

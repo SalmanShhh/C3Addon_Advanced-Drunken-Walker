@@ -2,12 +2,13 @@ export const config = {
   highlight: false,
   isDeprecated: false,
   returnType: "number",
-  description: "Column of the mark just placed, inside On Mark Placed.",
+  description:
+    "Current Y of the triggering walker. Reads 0 outside walker triggers.",
   params: [],
 };
 
 export const expose = true;
 
 export default function () {
-  return this._markCol();
+  return this._walkerY();
 }

@@ -2,12 +2,12 @@ export const config = {
   highlight: false,
   isDeprecated: false,
   returnType: "number",
-  description: "Column of the cell just written, inside On Cell Carved.",
+  description: "Current grid height in cells.",
   params: [],
 };
 
 export const expose = true;
 
 export default function () {
-  return this._carvedCol();
+  return this._gridHeight();
 }

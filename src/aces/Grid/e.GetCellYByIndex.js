@@ -3,7 +3,7 @@ export const config = {
   isDeprecated: false,
   returnType: "number",
   description:
-    "Row of the index-th cell holding the value, 0-based in a stable row-major order. Returns -1 when out of range.",
+    "Y of the index-th cell holding the value, 0-based in a stable left-to-right, top-to-bottom order. Returns -1 when out of range.",
   params: [
     { id: "value", name: "Value", desc: "The value to look up.", type: "number" },
     { id: "index", name: "Index", desc: "0-based index.", type: "number" },
@@ -13,5 +13,5 @@ export const config = {
 export const expose = true;
 
 export default function (value, index) {
-  return this._getCellRowByIndex(value, index);
+  return this._getCellYByIndex(value, index);
 }

@@ -2,13 +2,12 @@ export const config = {
   highlight: false,
   isDeprecated: false,
   returnType: "number",
-  description:
-    "Current column of the triggering walker. Reads 0 outside walker triggers.",
+  description: "Current grid width in cells.",
   params: [],
 };
 
 export const expose = true;
 
 export default function () {
-  return this._walkerCol();
+  return this._gridWidth();
 }

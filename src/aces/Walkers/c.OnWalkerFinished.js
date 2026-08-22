@@ -5,7 +5,7 @@ export const config = {
   listName: "On walker finished",
   displayText: "On walker [b]{0}[/b] finished",
   description:
-    "Fires when a walker exhausts its step budget or runs out of legal moves. WalkerCol and WalkerRow give its final cell, useful for chaining the next walker onto this one's endpoint. An empty filter matches all walkers.",
+    "Fires when a walker exhausts its step budget or runs out of legal moves. WalkerX and WalkerY give its final cell, useful for chaining the next walker onto this one's endpoint. An empty filter matches all walkers.",
   params: [
     {
       id: "walkerId",

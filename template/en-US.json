@@ -17,11 +17,11 @@
         "properties": {
           "gridWidth": {
             "name": "Grid Width",
-            "desc": "Columns created by Create Grid when it is called with a width of 0."
+            "desc": "Grid width in cells. The grid is built at this size automatically when the layout starts - Create Grid is only needed for a different size."
           },
           "gridHeight": {
             "name": "Grid Height",
-            "desc": "Rows created by Create Grid when it is called with a height of 0."
+            "desc": "Grid height in cells. The grid is built at this size automatically when the layout starts - Create Grid is only needed for a different size."
           },
           "maxGridSize": {
             "name": "Max Grid Size",
@@ -75,15 +75,15 @@
           "CreateGrid": {
             "list-name": "Create grid",
             "display-text": "{my} create grid [i]{0}[/i] x [i]{1}[/i]",
-            "description": "Allocate the grid filled with the Empty Value, clamped to Max Grid Size. Pass 0 for either dimension to use the property default. Destroys any previous grid, walkers and marks.",
+            "description": "Only needed for a size other than the Grid Width and Grid Height properties - the grid those describe already exists when the layout starts. Allocates a fresh grid filled with the Empty Value, clamped to Max Grid Size. Pass a negative for either dimension to fall back to that property. Destroys any previous grid, walkers and marks.",
             "params": {
               "width": {
                 "name": "Width",
-                "desc": "Columns, or 0 to use the Grid Width property."
+                "desc": "Grid width in cells. Negative falls back to the Grid Width property."
               },
               "height": {
                 "name": "Height",
-                "desc": "Rows, or 0 to use the Grid Height property."
+                "desc": "Grid height in cells. Negative falls back to the Grid Height property."
               }
             }
           },
@@ -92,13 +92,13 @@
             "display-text": "{my} set cell ([i]{0}[/i], [i]{1}[/i]) to [i]{2}[/i]",
             "description": "Write one cell directly, useful for pre-placing anchors before walkers run. Does not fire On Cell Carved.",
             "params": {
-              "col": {
-                "name": "Column",
-                "desc": "Cell column."
+              "x": {
+                "name": "X",
+                "desc": "Cell X, 0 at the left edge."
               },
-              "row": {
-                "name": "Row",
-                "desc": "Cell row."
+              "y": {
+                "name": "Y",
+                "desc": "Cell Y, 0 at the top edge."
               },
               "value": {
                 "name": "Value",
@@ -264,20 +264,20 @@
           },
           "AddWalker": {
             "list-name": "Add walker",
-            "display-text": "{my} add walker [b]{0}[/b] at ([i]{1}[/i], [i]{2}[/i]), [i]{3}[/i] steps, [i]{4}[/i] directions, max turn [i]{5}[/i], tag [i]{6}[/i]",
-            "description": "Register a walker with the given core settings. Remaining fields use the Walker Definition defaults. Walkers run in registration order.",
+            "display-text": "{my} add walker [b]{0}[/b] at ([i]{1}[/i], [i]{2}[/i]), [i]{3}[/i] steps, [i]{4}[/i] directions, max turn [i]{5}[/i], tag [i]{6}[/i], carving [i]{7}[/i]",
+            "description": "Register a walker with the given core settings, including the value it carves. Remaining fields use the Walker Definition defaults. Walkers run in registration order.",
             "params": {
               "walkerId": {
                 "name": "ID",
                 "desc": "Unique ID for this walker. Re-using an ID replaces that walker in place."
               },
-              "startCol": {
-                "name": "Start Column",
-                "desc": "Starting cell column."
+              "startX": {
+                "name": "Start X",
+                "desc": "Starting cell X, 0 at the left edge."
               },
-              "startRow": {
-                "name": "Start Row",
-                "desc": "Starting cell row."
+              "startY": {
+                "name": "Start Y",
+                "desc": "Starting cell Y, 0 at the top edge."
               },
               "steps": {
                 "name": "Steps",
@@ -294,17 +294,21 @@
               "tag": {
                 "name": "Tag",
                 "desc": "Groups walkers for Run Walkers By Tag. Empty for untagged."
+              },
+              "carveValue": {
+                "name": "Carve Value",
+                "desc": "The integer this walker writes into every cell it visits. Give each walker its own value to layer floors, water, ore and decoration in one grid, then read them back per value."
               }
             }
           },
           "DefineWalker": {
             "list-name": "Define walker",
             "display-text": "{my} define walker from [i]{0}[/i]",
-            "description": "Register a walker from a full Walker Definition JSON string, for example {\"id\":\"cave\",\"startCol\":32,\"startRow\":32,\"steps\":400,\"directions\":8,\"maxTurn\":180,\"startAngle\":0,\"turnChance\":1,\"carveValue\":1,\"brushSize\":1,\"tag\":\"\"}. Replaces any existing walker with the same id.",
+            "description": "Register a walker from a full Walker Definition JSON string, for example {\"id\":\"cave\",\"startX\":32,\"startY\":32,\"steps\":400,\"directions\":8,\"maxTurn\":180,\"startAngle\":0,\"turnChance\":1,\"carveValue\":1,\"brushSize\":1,\"tag\":\"\"}. Replaces any existing walker with the same id.",
             "params": {
               "definition": {
                 "name": "Definition",
-                "desc": "Walker Definition as a JSON string. Only id, startCol and startRow are required."
+                "desc": "Walker Definition as a JSON string. Only id, startX and startY are required."
               }
             }
           },
@@ -344,6 +348,21 @@
               "tag": {
                 "name": "Tag",
                 "desc": "Walker tag to run. Empty runs only untagged walkers."
+              }
+            }
+          },
+          "SetWalkerCarveValue": {
+            "list-name": "Set walker carve value",
+            "display-text": "{my} set walker [b]{0}[/b] carve value to [i]{1}[/i]",
+            "description": "Change the integer a walker writes into the cells it visits. It applies from the walker's next step, so cells it has already carved keep their old value. Set it before running the walker to pick that walker's terrain, or change it mid-run from On Walker Stepped to lay down two values along one path.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to change."
+              },
+              "value": {
+                "name": "Carve Value",
+                "desc": "The integer written into every cell the walker visits from now on."
               }
             }
           },
@@ -403,13 +422,13 @@
             "display-text": "Cell ([i]{0}[/i], [i]{1}[/i]) is [i]{2}[/i]",
             "description": "True if the cell holds exactly the given value. Out-of-bounds cells match nothing.",
             "params": {
-              "col": {
-                "name": "Column",
-                "desc": "Cell column."
+              "x": {
+                "name": "X",
+                "desc": "Cell X, 0 at the left edge."
               },
-              "row": {
-                "name": "Row",
-                "desc": "Cell row."
+              "y": {
+                "name": "Y",
+                "desc": "Cell Y, 0 at the top edge."
               },
               "value": {
                 "name": "Value",
@@ -422,13 +441,13 @@
             "display-text": "([i]{0}[/i], [i]{1}[/i]) is inside the grid",
             "description": "True if the coordinates fall within the current grid.",
             "params": {
-              "col": {
-                "name": "Column",
-                "desc": "Cell column."
+              "x": {
+                "name": "X",
+                "desc": "Cell X, 0 at the left edge."
               },
-              "row": {
-                "name": "Row",
-                "desc": "Cell row."
+              "y": {
+                "name": "Y",
+                "desc": "Cell Y, 0 at the top edge."
               }
             }
           },
@@ -437,13 +456,13 @@
             "display-text": "Cell ([i]{0}[/i], [i]{1}[/i]) has a [i]{2}[/i] mark",
             "description": "True if a mark with the tag sits on that cell. An empty tag matches any mark.",
             "params": {
-              "col": {
-                "name": "Column",
-                "desc": "Cell column."
+              "x": {
+                "name": "X",
+                "desc": "Cell X, 0 at the left edge."
               },
-              "row": {
-                "name": "Row",
-                "desc": "Cell row."
+              "y": {
+                "name": "Y",
+                "desc": "Cell Y, 0 at the top edge."
               },
               "tag": {
                 "name": "Tag",
@@ -454,7 +473,7 @@
           "OnMarkPlaced": {
             "list-name": "On mark placed",
             "display-text": "On [i]{0}[/i] mark placed",
-            "description": "Fires once per mark from Drop Marks Along Walk and Scatter Marks. Use MarkCol, MarkRow and MarkTag inside. An empty filter matches all tags.",
+            "description": "Fires once per mark from Drop Marks Along Walk and Scatter Marks. Use MarkX, MarkY and MarkTag inside. An empty filter matches all tags.",
             "params": {
               "tag": {
                 "name": "Tag",
@@ -476,7 +495,7 @@
           "OnCellCarved": {
             "list-name": "On cell carved",
             "display-text": "On cell carved",
-            "description": "Fires once per cell whose value changes during walker runs, dilation or outlining. Use CarvedCol, CarvedRow, CarvedValue and WalkerID inside. On big grids prefer iterating results after generation over per-cell spawning here.",
+            "description": "Fires once per cell whose value changes during walker runs, dilation or outlining. Use CarvedX, CarvedY, CarvedValue and WalkerID inside. On big grids prefer iterating results after generation over per-cell spawning here.",
             "params": {}
           },
           "OnGenerationComplete": {
@@ -488,7 +507,7 @@
           "OnWalkerFinished": {
             "list-name": "On walker finished",
             "display-text": "On walker [b]{0}[/b] finished",
-            "description": "Fires when a walker exhausts its step budget or runs out of legal moves. WalkerCol and WalkerRow give its final cell, useful for chaining the next walker onto this one's endpoint. An empty filter matches all walkers.",
+            "description": "Fires when a walker exhausts its step budget or runs out of legal moves. WalkerX and WalkerY give its final cell, useful for chaining the next walker onto this one's endpoint. An empty filter matches all walkers.",
             "params": {
               "walkerId": {
                 "name": "ID",
@@ -510,7 +529,7 @@
           "OnWalkerStepped": {
             "list-name": "On walker stepped",
             "display-text": "On walker [b]{0}[/b] stepped",
-            "description": "Fires after each step of Step Walker only, batch runs skip it for speed. WalkerCol, WalkerRow, WalkerAngle and WalkerStepsLeft are valid inside. An empty filter matches all walkers.",
+            "description": "Fires after each step of Step Walker only, batch runs skip it for speed. WalkerX, WalkerY, WalkerAngle and WalkerStepsLeft are valid inside. An empty filter matches all walkers.",
             "params": {
               "walkerId": {
                 "name": "ID",
@@ -524,9 +543,9 @@
             "translated-name": "CellToLayoutX",
             "description": "Layout X of the cell's centre, from Origin X and Cell Size.",
             "params": {
-              "col": {
-                "name": "Column",
-                "desc": "Cell column."
+              "x": {
+                "name": "X",
+                "desc": "Cell X, 0 at the left edge."
               }
             }
           },
@@ -534,9 +553,9 @@
             "translated-name": "CellToLayoutY",
             "description": "Layout Y of the cell's centre, from Origin Y and Cell Size.",
             "params": {
-              "row": {
-                "name": "Row",
-                "desc": "Cell row."
+              "y": {
+                "name": "Y",
+                "desc": "Cell Y, 0 at the top edge."
               }
             }
           },
@@ -544,19 +563,19 @@
             "translated-name": "CellValue",
             "description": "Value at the cell. Returns the Empty Value for out-of-bounds queries.",
             "params": {
-              "col": {
-                "name": "Column",
-                "desc": "Cell column."
+              "x": {
+                "name": "X",
+                "desc": "Cell X, 0 at the left edge."
               },
-              "row": {
-                "name": "Row",
-                "desc": "Cell row."
+              "y": {
+                "name": "Y",
+                "desc": "Cell Y, 0 at the top edge."
               }
             }
           },
           "CountCells": {
             "translated-name": "CountCells",
-            "description": "Total cells currently holding the value. Pairs with GetCellColByIndex and GetCellRowByIndex to iterate results.",
+            "description": "Total cells currently holding the value. Pairs with GetCellXByIndex and GetCellYByIndex to iterate results.",
             "params": {
               "value": {
                 "name": "Value",
@@ -564,9 +583,9 @@
               }
             }
           },
-          "GetCellColByIndex": {
-            "translated-name": "GetCellColByIndex",
-            "description": "Column of the index-th cell holding the value, 0-based in a stable row-major order. Returns -1 when out of range.",
+          "GetCellXByIndex": {
+            "translated-name": "GetCellXByIndex",
+            "description": "X of the index-th cell holding the value, 0-based in a stable left-to-right, top-to-bottom order. Returns -1 when out of range.",
             "params": {
               "value": {
                 "name": "Value",
@@ -578,9 +597,9 @@
               }
             }
           },
-          "GetCellRowByIndex": {
-            "translated-name": "GetCellRowByIndex",
-            "description": "Row of the index-th cell holding the value, 0-based in a stable row-major order. Returns -1 when out of range.",
+          "GetCellYByIndex": {
+            "translated-name": "GetCellYByIndex",
+            "description": "Y of the index-th cell holding the value, 0-based in a stable left-to-right, top-to-bottom order. Returns -1 when out of range.",
             "params": {
               "value": {
                 "name": "Value",
@@ -592,19 +611,19 @@
               }
             }
           },
-          "GridCols": {
-            "translated-name": "GridCols",
-            "description": "Current grid width in cells.",
-            "params": {}
-          },
-          "GridRows": {
-            "translated-name": "GridRows",
+          "GridHeight": {
+            "translated-name": "GridHeight",
             "description": "Current grid height in cells.",
             "params": {}
           },
-          "LayoutToCol": {
-            "translated-name": "LayoutToCol",
-            "description": "Column containing the layout X coordinate. May fall outside the grid.",
+          "GridWidth": {
+            "translated-name": "GridWidth",
+            "description": "Current grid width in cells.",
+            "params": {}
+          },
+          "LayoutToX": {
+            "translated-name": "LayoutToX",
+            "description": "Cell X containing the layout X coordinate. May fall outside the grid.",
             "params": {
               "x": {
                 "name": "X",
@@ -612,9 +631,9 @@
               }
             }
           },
-          "LayoutToRow": {
-            "translated-name": "LayoutToRow",
-            "description": "Row containing the layout Y coordinate. May fall outside the grid.",
+          "LayoutToY": {
+            "translated-name": "LayoutToY",
+            "description": "Cell Y containing the layout Y coordinate. May fall outside the grid.",
             "params": {
               "y": {
                 "name": "Y",
@@ -626,13 +645,13 @@
             "translated-name": "NeighbourCount",
             "description": "How many of the 8 neighbours hold the given value, handy for autotiling and custom placement rules. Off-grid neighbours never match.",
             "params": {
-              "col": {
-                "name": "Column",
-                "desc": "Cell column."
+              "x": {
+                "name": "X",
+                "desc": "Cell X, 0 at the left edge."
               },
-              "row": {
-                "name": "Row",
-                "desc": "Cell row."
+              "y": {
+                "name": "Y",
+                "desc": "Cell Y, 0 at the top edge."
               },
               "value": {
                 "name": "Value",
@@ -642,7 +661,7 @@
           },
           "CountMarks": {
             "translated-name": "CountMarks",
-            "description": "Marks with the tag. An empty tag counts every mark. Pairs with GetMarkColByIndex and GetMarkRowByIndex to iterate results.",
+            "description": "Marks with the tag. An empty tag counts every mark. Pairs with GetMarkXByIndex and GetMarkYByIndex to iterate results.",
             "params": {
               "tag": {
                 "name": "Tag",
@@ -650,23 +669,9 @@
               }
             }
           },
-          "GetMarkColByIndex": {
-            "translated-name": "GetMarkColByIndex",
-            "description": "Column of the index-th mark with the tag, 0-based in placement order. Returns -1 when out of range.",
-            "params": {
-              "tag": {
-                "name": "Tag",
-                "desc": "Mark tag, or empty for all marks."
-              },
-              "index": {
-                "name": "Index",
-                "desc": "0-based index."
-              }
-            }
-          },
-          "GetMarkRowByIndex": {
-            "translated-name": "GetMarkRowByIndex",
-            "description": "Row of the index-th mark with the tag, 0-based in placement order. Returns -1 when out of range.",
+          "GetMarkXByIndex": {
+            "translated-name": "GetMarkXByIndex",
+            "description": "X of the index-th mark with the tag, 0-based in placement order. Returns -1 when out of range.",
             "params": {
               "tag": {
                 "name": "Tag",
@@ -678,19 +683,33 @@
               }
             }
           },
-          "MarkCol": {
-            "translated-name": "MarkCol",
-            "description": "Column of the mark just placed, inside On Mark Placed.",
-            "params": {}
-          },
-          "MarkRow": {
-            "translated-name": "MarkRow",
-            "description": "Row of the mark just placed, inside On Mark Placed.",
-            "params": {}
+          "GetMarkYByIndex": {
+            "translated-name": "GetMarkYByIndex",
+            "description": "Y of the index-th mark with the tag, 0-based in placement order. Returns -1 when out of range.",
+            "params": {
+              "tag": {
+                "name": "Tag",
+                "desc": "Mark tag, or empty for all marks."
+              },
+              "index": {
+                "name": "Index",
+                "desc": "0-based index."
+              }
+            }
           },
           "MarkTag": {
             "translated-name": "MarkTag",
             "description": "Tag of the mark just placed, inside On Mark Placed.",
+            "params": {}
+          },
+          "MarkX": {
+            "translated-name": "MarkX",
+            "description": "X of the mark just placed, inside On Mark Placed.",
+            "params": {}
+          },
+          "MarkY": {
+            "translated-name": "MarkY",
+            "description": "Y of the mark just placed, inside On Mark Placed.",
             "params": {}
           },
           "CurrentSeed": {
@@ -698,19 +717,19 @@
             "description": "The seed the PRNG was last set with.",
             "params": {}
           },
-          "CarvedCol": {
-            "translated-name": "CarvedCol",
-            "description": "Column of the cell just written, inside On Cell Carved.",
-            "params": {}
-          },
-          "CarvedRow": {
-            "translated-name": "CarvedRow",
-            "description": "Row of the cell just written, inside On Cell Carved.",
-            "params": {}
-          },
           "CarvedValue": {
             "translated-name": "CarvedValue",
             "description": "Value just written into the cell, inside On Cell Carved.",
+            "params": {}
+          },
+          "CarvedX": {
+            "translated-name": "CarvedX",
+            "description": "X of the cell just written, inside On Cell Carved.",
+            "params": {}
+          },
+          "CarvedY": {
+            "translated-name": "CarvedY",
+            "description": "Y of the cell just written, inside On Cell Carved.",
             "params": {}
           },
           "WalkerAngle": {
@@ -718,19 +737,9 @@
             "description": "Current heading of the triggering walker in degrees, 0 = right and 90 = down. Reads 0 outside walker triggers.",
             "params": {}
           },
-          "WalkerCol": {
-            "translated-name": "WalkerCol",
-            "description": "Current column of the triggering walker. Reads 0 outside walker triggers.",
-            "params": {}
-          },
           "WalkerID": {
             "translated-name": "WalkerID",
             "description": "ID of the triggering walker, inside walker triggers and On Cell Carved. Empty for post-processing passes and outside triggers.",
-            "params": {}
-          },
-          "WalkerRow": {
-            "translated-name": "WalkerRow",
-            "description": "Current row of the triggering walker. Reads 0 outside walker triggers.",
             "params": {}
           },
           "WalkerStepsLeft": {
@@ -741,6 +750,16 @@
           "WalkerTag": {
             "translated-name": "WalkerTag",
             "description": "Tag of the triggering walker, inside walker triggers and On Cell Carved, or the batch tag inside On Walkers By Tag Complete.",
+            "params": {}
+          },
+          "WalkerX": {
+            "translated-name": "WalkerX",
+            "description": "Current X of the triggering walker. Reads 0 outside walker triggers.",
+            "params": {}
+          },
+          "WalkerY": {
+            "translated-name": "WalkerY",
+            "description": "Current Y of the triggering walker. Reads 0 outside walker triggers.",
             "params": {}
           }
         }
