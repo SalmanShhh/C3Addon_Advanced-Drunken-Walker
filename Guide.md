@@ -1,5 +1,7 @@
 # Advanced Drunken Walkers
 
+*Guide for version 1.1.0.0.*
+
 Advanced Drunken Walkers is a seeded drunkard's-walk generation engine for Construct 3. It is an invisible logic object that owns an integer grid and a set of named **walkers**, agents that stagger across that grid one cell at a time carving values as they go. On top of carving it runs deterministic **mark** passes that drop tagged points along a walk or scatter them across carved regions, so coins, enemies, objectives and decorations all come out of the same seed as the map itself. The plugin draws nothing and spawns nothing: it hands you cell values and tagged points, and you paint them with a Tilemap, sprites, 3D shapes or nothing at all. Everything flows from one seedable PRNG, so the same seed reproduces the same floors, the same coin positions and the same decoration scatter on every device and every export platform.
 
 ## Table of Contents
@@ -11,23 +13,24 @@ Advanced Drunken Walkers is a seeded drunkard's-walk generation engine for Const
 5. [The Grid](#5-the-grid)
 6. [Walkers](#6-walkers)
 7. [Direction Weights](#7-direction-weights)
-8. [Seeding and Determinism](#8-seeding-and-determinism)
-9. [Marks](#9-marks)
-10. [Post-Processing Passes](#10-post-processing-passes)
-11. [Reading the Results](#11-reading-the-results)
-12. [Animated Generation](#12-animated-generation)
-13. [Save and Load](#13-save-and-load)
-14. [Actions Reference](#14-actions-reference)
-15. [Conditions Reference](#15-conditions-reference)
-16. [Expressions Reference](#16-expressions-reference)
-17. [Triggers Reference](#17-triggers-reference)
-18. [System Use Cases](#18-system-use-cases)
-19. [Game Use Cases](#19-game-use-cases)
-20. [C3 Debugger](#20-c3-debugger)
-21. [Scripting (C3 Script / JavaScript)](#21-scripting-c3-script--javascript)
-22. [Deep Dive: The Determinism Model](#22-deep-dive-the-determinism-model)
-23. [Deep Dive: Advanced Random Integration](#23-deep-dive-advanced-random-integration)
-24. [Tips and Common Mistakes](#24-tips-and-common-mistakes)
+8. [Shape Recipes](#8-shape-recipes)
+9. [Seeding and Determinism](#9-seeding-and-determinism)
+10. [Marks](#10-marks)
+11. [Post-Processing Passes](#11-post-processing-passes)
+12. [Reading the Results](#12-reading-the-results)
+13. [Animated Generation](#13-animated-generation)
+14. [Save and Load](#14-save-and-load)
+15. [Actions Reference](#15-actions-reference)
+16. [Conditions Reference](#16-conditions-reference)
+17. [Expressions Reference](#17-expressions-reference)
+18. [Triggers Reference](#18-triggers-reference)
+19. [System Use Cases](#19-system-use-cases)
+20. [Game Use Cases](#20-game-use-cases)
+21. [C3 Debugger](#21-c3-debugger)
+22. [Scripting (C3 Script / JavaScript)](#22-scripting-c3-script--javascript)
+23. [Deep Dive: The Determinism Model](#23-deep-dive-the-determinism-model)
+24. [Deep Dive: Advanced Random Integration](#24-deep-dive-advanced-random-integration)
+25. [Tips and Common Mistakes](#25-tips-and-common-mistakes)
 
 ---
 
@@ -91,7 +94,7 @@ Advanced Drunken Walker replaces that with one contract. You describe walkers an
 
 **Step 4: set the properties.** Leave *Grid Width* and *Grid Height* at 64 for now, set *Cell Size* to match your tilemap tile size, and leave *Empty Value* at 0. Tick *Debug Mode* while you are building so the plugin logs what it is doing.
 
-**Step 5: generate and draw.** The minimum viable setup is four actions and one loop. Create the grid, seed the generator, register a walker, run it, then paint the results.
+**Step 5: generate and draw.** The minimum viable setup is four actions and one loop. Size the grid, seed the generator, register a walker, run it, then paint the results. *Create Grid* is only in here because this example wants 40x30 rather than the 64x64 the properties describe. Had you set the properties to the size you wanted, that grid would already exist and you could drop the action entirely.
 
 ```
 Event: On start of layout
@@ -101,14 +104,38 @@ Event: On start of layout
   Action: AdvWalker > Run all walkers
 
 Event: AdvWalker > On generation complete
-  Action: System > Repeat AdvWalker.CountCells(1) times
-    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex), AdvWalker.GetCellYByIndex(1, loopindex)) to tile 0
-  // CountCells(1) is every cell the walker carved. Value 1 is the default carve value.
+  Action: System > For "cell" from 0 to AdvWalker.CountCells(1) - 1
+    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex("cell")), AdvWalker.GetCellYByIndex(1, loopindex("cell"))) to tile 0
+  // The trailing 1 on Add walker is the carve value, so CountCells(1) is every cell it carved.
+  // The For loop names its index, so loopindex("cell") stays readable once loops nest.
 ```
 
 Run the layout and you have a winding cave painted into your Tilemap. Change the seed string and you get a different cave. Change it back and the first cave returns, cell for cell.
 
 **Step 6: check your work.** Open *Debug Layout* rather than *Preview*, select the AdvWalker object in the inspector, and you will see the grid size, the active seed, every registered walker and every mark tag. That panel answers most "why is my map empty" questions in a couple of seconds.
+
+### Upgrading from 1.0.0.0
+
+Version 1.1.0.0 renamed the API so that a size is always a width and a height, and a position is always an X and a Y. Generation behaves identically, but every renamed expression and parameter has to be updated in your event sheets, and savegames written by 1.0.0.0 no longer load.
+
+| 1.0.0.0 | 1.1.0.0 |
+|---|---|
+| `GridCols` / `GridRows` | `GridWidth` / `GridHeight` |
+| `GetCellColByIndex` / `GetCellRowByIndex` | `GetCellXByIndex` / `GetCellYByIndex` |
+| `GetMarkColByIndex` / `GetMarkRowByIndex` | `GetMarkXByIndex` / `GetMarkYByIndex` |
+| `LayoutToCol` / `LayoutToRow` | `LayoutToX` / `LayoutToY` |
+| `MarkCol` / `MarkRow` | `MarkX` / `MarkY` |
+| `CarvedCol` / `CarvedRow` | `CarvedX` / `CarvedY` |
+| `WalkerCol` / `WalkerRow` | `WalkerX` / `WalkerY` |
+| Column and Row parameters | X and Y parameters |
+| *Add Walker* Start Column / Start Row | Start X / Start Y |
+| `startCol` / `startRow` in a Walker Definition | `startX` / `startY` |
+
+Three behaviour changes come with the rename:
+
+- The grid described by *Grid Width* and *Grid Height* has always been built for you at startup. That is now stated plainly throughout this guide, because most projects never need *Create Grid* at all.
+- *Create Grid* takes a **negative** width or height to mean "use the property". A 0 used to mean that. It is now treated as a mistake: it warns in debug mode and falls back to the property rather than leaving you a grid with no cells.
+- *Add Walker* gained a trailing **Carve Value** parameter, and the new *Set Walker Carve Value* action changes it later. A walker no longer needs a *Define Walker* JSON string just to write something other than 1.
 
 ---
 
@@ -201,9 +228,9 @@ Event: On Mouse clicked
 
 ```
 Event: On function "PaintAutotile"
-  Action: System > Repeat AdvWalker.CountCells(1) times
-    Action: System > Set CellX to AdvWalker.GetCellXByIndex(1, loopindex)
-    Action: System > Set CellY to AdvWalker.GetCellYByIndex(1, loopindex)
+  Action: System > For "cell" from 0 to AdvWalker.CountCells(1) - 1
+    Action: System > Set CellX to AdvWalker.GetCellXByIndex(1, loopindex("cell"))
+    Action: System > Set CellY to AdvWalker.GetCellYByIndex(1, loopindex("cell"))
     Action: Tilemap > Set tile (CellX, CellY) to tile AdvWalker.NeighbourCount(CellX, CellY, 1)
     // Eight neighbours means "fully enclosed floor", fewer means an edge tile.
 ```
@@ -411,7 +438,7 @@ Tags let you stage generation in passes, which matters because later passes can 
 Event: On function "Generate"
   Action: AdvWalker > Add walker -> "cave1", 20, 20, 500, 8, 180, "cave", 1
   Action: AdvWalker > Add walker -> "cave2", 40, 30, 500, 8, 180, "cave", 1
-  Action: AdvWalker > Define walker -> "{""id"":""river"",""startX"":0,""startY"":5,""steps"":200,""directions"":3,""maxTurn"":45,""carveValue"":2,""tag"":""water""}"
+  Action: AdvWalker > Add walker -> "river", 0, 5, 200, 3, 45, "water", 2
   Action: AdvWalker > Run walkers tagged -> "cave"
   Action: AdvWalker > Outline cells -> 1, 3
   Action: AdvWalker > Run walkers tagged -> "water"
@@ -453,6 +480,7 @@ By default a walker picks evenly among the headings it can reach. **Direction we
 
 - A weight of **0** rules that direction out entirely.
 - Any entry you **leave off** counts as 1, so `"6,3"` on an eight direction walker weights the first two and leaves the other six at 1.
+- Any **extra** entry is ignored. Only the first `directions` weights are read, so `"9,3,1,0,0,0,1,3"` on a three direction walker is just `"9,3,1"`.
 - **Negative** values are floored to 0, and non-numeric entries fall back to 1.
 - An **empty string** restores equal weights.
 
@@ -492,7 +520,174 @@ Weights survive save and load, and the weighted pick consumes exactly one random
 
 ---
 
-## 8. Seeding and Determinism
+## 8. Shape Recipes
+
+Everything a walker draws comes out of four fields pulling against each other. Once you read them as a set, "I want a winding tunnel" turns into concrete numbers instead of guesswork.
+
+| Field | What it decides |
+|---|---|
+| `directions` | How many headings exist at all. They are spread evenly around the circle, anchored at `startAngle`. |
+| `maxTurn` | How far the heading may swing in one step, which decides how many of those headings are reachable right now. |
+| `turnChance` | How often the walker even considers turning. Low values give long straight runs between decisions. |
+| `brushSize` or the dig size | How much it stamps per step, which sets thickness independently of the path. |
+
+The pair that matters most is `directions` with `maxTurn`. A large direction set with a small max turn gives smooth curves, because each step can only nudge the heading. The same direction set with a max turn of 180 gives jitter, because every heading is reachable from every other.
+
+### The recipes
+
+Each row is a starting point rather than a rule. These are all *Add Walker* parameters or Walker Definition fields, and the weights column needs either the `weights` field or *Set Walker Direction Weights*.
+
+| Shape | `directions` | `maxTurn` | `turnChance` | Brush | Weights |
+|---|---|---|---|---|---|
+| Jittery cave, the classic | 8 | 180 | 1 | 1 | none |
+| Smooth winding cavern | 8 | 45 | 1 | 1 | none |
+| Dungeon corridors, right angles | 4 | 90 | 0.15 | 1 | none |
+| Wide corridors | 4 | 90 | 0.15 | dig size 5 by 1 | none |
+| Straight shaft or lift well | 1 | any | any | 1 | none |
+| Zigzag ribbon, river or road | 3 | 45 | 0.35 | 2 | none |
+| Lightning bolt or crack | 8 | 45 | 1 | 1 | `1,5,9,5,1,0,0,0` |
+| Ore vein, always descending | 8 | 90 | 1 | 1 | `2,6,9,6,2,0,0,0` |
+| Blob chamber, short and fat | 8 | 180 | 1 | 4, over 30 to 50 steps | none |
+
+Weights are positional and start at `startAngle`, so `1,5,9,5,1,0,0,0` on an eight direction walker with `startAngle` 0 peaks at index 2, which is 90 degrees, straight down. The three zeros at the end rule out the upward headings entirely.
+
+### What they actually look like
+
+Real output, one walker on a 44 by 13 grid, `#` for a carved cell.
+
+**Jittery cave.** `directions` 8, `maxTurn` 180. Dense and lumpy, and it stays local because it doubles back constantly.
+
+```
+........##.###...............##.............
+.....#..#######..............###............
+....#.#.#...###....#.....######...#.........
+......##....#######.############.###........
+.......#.....#.###..##.###.######.#.........
+............##...#.....##.#########.........
+............#.#.#.###.###..####.............
+.............############...##..............
+.............###.#..###......#..............
+..............####.###......................
+...............###..##......................
+.................###.#......................
+.................#####......................
+```
+
+**Smooth winding cavern.** `directions` 8, `maxTurn` 45. The same step budget covers far more ground, because a walker that cannot turn sharply keeps travelling.
+
+```
+........########............###.............
+.......#####...##.........##...#...#........
+...####.###....##........#.....#....#.......
+.##.....##.#...##........#....#......#......
+#.......#...##.##.......#.....#.......#.....
+#......###....##...##...######.........#....
+#......##.#...#...#..####..............#....
+#......##..#..#...#..###................#...
+####...#.#..####..#..####.......##......#...
+#...###..##.#..######..#.#.##..#..#..##..#..
+##.#..###.###..####.##..###..##....##..#.#..
+.###..#..#####.#.#############.........#.###
+##..#####..#.####..###.######...........####
+```
+
+**Dungeon corridors.** `directions` 4, `maxTurn` 90, `turnChance` 0.15. Four headings means no diagonals, and the low turn chance is what produces the long straight runs and the clean right angle junctions.
+
+```
+############################################
+##.............#.................#......#..#
+##.............#.................#......#..#
+##........####################...#......#..#
+##........#....#.............#####......####
+###.......#....#................##.........#
+.##.......#....#......############.........#
+.##.......#....#.................#.........#
+###.......#....#.................###.......#
+#.#.......#....#................##.#.......#
+#.#.......#....#................####.......#
+#.#.......#....#.................#.........#
+###.......######.................###########
+```
+
+**Lightning bolt.** `directions` 8, `maxTurn` 45, weights `1,5,9,5,1,0,0,0`, 12 steps. It drifts left and right but can never climb.
+
+```
+......................#.....................
+.......................#....................
+........................#...................
+........................#...................
+.......................#....................
+......................#.....................
+.....................#......................
+.....................#......................
+.....................#......................
+......................#.....................
+.......................#....................
+........................#...................
+........................#...................
+```
+
+### Three traps worth knowing
+
+**Two directions cannot turn unless `maxTurn` is 180.** With `directions` 2 the two headings sit 180 degrees apart, so any smaller max turn puts the second one out of reach and the walker draws a dead straight line, identical to `directions` 1. Raise the max turn to 180 and you get the opposite problem: it reverses on the spot, and 60 steps of walking carve 8 cells of corridor.
+
+**Diagonal movement leaves holes.** A diagonal step moves one cell on both axes at once, so it never touches the cells in between. Four directions at `startAngle` 45 gives a lattice rather than a corridor:
+
+```
+................................#...........
+.............................#.#.#..........
+..........................#.#.#...#.........
+.........................#.#.....#..........
+..........................#.....#...#.......
+.........................#.....#...#.#......
+......................#.#.....#...#...#.....
+.......................#.....#.#.#...#.#....
+............................#.#.#.#.#.#.....
+...........................#...#.#.#.#......
+..........................#.#.#.#.#.#.......
+...........................#.#...#.#........
+..................................#.........
+```
+
+The fix is thickness, not direction. The same walker with `brushSize` 2 is solid:
+
+```
+................................##..........
+.............................######.........
+..........................##########........
+.........................#######.###........
+.........................####...###.##......
+.........................###...###.####.....
+......................#####...###.######....
+......................####...#######.####...
+.......................##...#############...
+...........................#############....
+..........................#############.....
+..........................############......
+...........................####..####.......
+```
+
+**Borders repel, they do not stop.** A walker that would step outside the grid re-rolls among its legal headings instead, so one that reaches an edge tends to run along it and leave a suspiciously straight line down the side of your map. If you see that, give it fewer steps, start it further in, or generate on a grid slightly larger than the area you paint.
+
+### Combining them
+
+None of this is exclusive. The usual pattern is several walkers on one grid, each with its own recipe and its own carve value, run in the order you want them layered:
+
+```
+Event: On function "BuildWorld"
+  Action: AdvWalker > Add walker -> "caves", 32, 32, 600, 8, 180, "terrain", 1
+  Action: AdvWalker > Add walker -> "halls", 10, 10, 300, 4, 90, "terrain", 1
+  Action: AdvWalker > Add walker -> "river", 0, 20, 250, 3, 45, "water", 2
+  Action: AdvWalker > Set walker "river" direction weights -> "9,3,1"
+  Action: AdvWalker > Run walkers tagged -> "terrain"
+  Action: AdvWalker > Run walkers tagged -> "water"
+  // Terrain first, then the river cuts through it, because a later walker
+  // overwrites what an earlier one carved.
+```
+
+---
+
+## 9. Seeding and Determinism
 
 *Set Seed* resets the internal generator from a string. Any string works, and strings that differ by a single character produce completely unrelated maps, so `"level-1"` and `"level-2"` will not look like siblings.
 
@@ -512,13 +707,13 @@ Event: On function "ShowSeedToPlayer"
   // Works whether the seed came from Set Seed or was derived from the clock.
 ```
 
-*Set Random Source* switches between the built-in generator and an injected queue. See [Deep Dive: Advanced Random Integration](#23-deep-dive-advanced-random-integration) for when that is worth doing.
+*Set Random Source* switches between the built-in generator and an injected queue. See [Deep Dive: Advanced Random Integration](#24-deep-dive-advanced-random-integration) for when that is worth doing.
 
 Note that *Create Grid* does not reset the seed, and *Set Seed* does not clear the grid. They are independent on purpose, so you can re-seed and re-run without reallocating, or reallocate without disturbing the stream.
 
 ---
 
-## 9. Marks
+## 10. Marks
 
 A **mark** is a tagged point on the grid. The plugin decides where marks go and guarantees their spacing. You decide what each tag means when you read the results back.
 
@@ -586,7 +781,7 @@ Event: On function "RerollEnemies"
 
 ---
 
-## 10. Post-Processing Passes
+## 11. Post-Processing Passes
 
 Two actions reshape the grid after the walkers have run. Both fire *On Cell Carved* for every cell they change, and both report an empty `WalkerID` because no walker was responsible.
 
@@ -629,7 +824,7 @@ Event: On function "LayeredWalls"
 
 ---
 
-## 11. Reading the Results
+## 12. Reading the Results
 
 There are two ways to get the generated world out of the plugin, and picking the right one matters for performance.
 
@@ -639,21 +834,21 @@ There are two ways to get the generated world out of the plugin, and picking the
 
 ```
 Event: AdvWalker > On generation complete
-  Action: System > Repeat AdvWalker.CountCells(1) times
-    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex), AdvWalker.GetCellYByIndex(1, loopindex)) to tile 0
-  Action: System > Repeat AdvWalker.CountCells(3) times
-    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(3, loopindex), AdvWalker.GetCellYByIndex(3, loopindex)) to tile 1
-  Action: System > Repeat AdvWalker.CountMarks("enemy") times
+  Action: System > For "floor" from 0 to AdvWalker.CountCells(1) - 1
+    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex("floor")), AdvWalker.GetCellYByIndex(1, loopindex("floor"))) to tile 0
+  Action: System > For "wall" from 0 to AdvWalker.CountCells(3) - 1
+    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(3, loopindex("wall")), AdvWalker.GetCellYByIndex(3, loopindex("wall"))) to tile 1
+  Action: System > For "enemy" from 0 to AdvWalker.CountMarks("enemy") - 1
     Action: System > Create object Enemy on layer "Game" at
-            (AdvWalker.CellToLayoutX(AdvWalker.GetMarkXByIndex("enemy", loopindex)),
-             AdvWalker.CellToLayoutY(AdvWalker.GetMarkYByIndex("enemy", loopindex)))
+            (AdvWalker.CellToLayoutX(AdvWalker.GetMarkXByIndex("enemy", loopindex("enemy"))),
+             AdvWalker.CellToLayoutY(AdvWalker.GetMarkYByIndex("enemy", loopindex("enemy"))))
 ```
 
 `CountMarks("")` with an empty tag counts every mark regardless of tag, and the index expressions accept an empty tag the same way, so you can iterate the complete mark list when you want a single dispatcher.
 
 ```
 Event: On function "SpawnEverything"
-  Action: System > Repeat AdvWalker.CountMarks("") times
+  Action: System > For "mark" from 0 to AdvWalker.CountMarks("") - 1
     Action: System > Set Tag to ... // read the tag with your own lookup, or iterate per tag instead
 ```
 
@@ -691,7 +886,7 @@ All the filtered triggers treat an empty filter string as "match everything".
 
 ---
 
-## 12. Animated Generation
+## 13. Animated Generation
 
 *Step Walker* advances one walker by up to N steps instead of running it to completion. Call it every tick and the map draws itself in front of the player, using the exact same engine and the exact same seed as an instant generation would.
 
@@ -736,7 +931,7 @@ Because *Step Walker* carves the start cell on the walker's very first step, you
 
 ---
 
-## 13. Save and Load
+## 14. Save and Load
 
 The plugin fully supports Construct's built-in save and load system. A save captures the grid buffer, the origin and cell size, the seed, **the PRNG state**, every registered walker including its progress along its path, and every mark.
 
@@ -747,8 +942,8 @@ Event: On function "QuickSave"
   Action: System > Save game to slot "quick"
 
 Event: On loaded
-  Action: System > Repeat AdvWalker.CountCells(1) times
-    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex), AdvWalker.GetCellYByIndex(1, loopindex)) to tile 0
+  Action: System > For "cell" from 0 to AdvWalker.CountCells(1) - 1
+    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex("cell")), AdvWalker.GetCellYByIndex(1, loopindex("cell"))) to tile 0
   // The grid came back with the save. Repaint from it, do not regenerate.
 ```
 
@@ -767,7 +962,7 @@ Event: On loaded
 
 ---
 
-## 14. Actions Reference
+## 15. Actions Reference
 
 ### Grid
 
@@ -818,7 +1013,7 @@ Event: On loaded
 
 ---
 
-## 15. Conditions Reference
+## 16. Conditions Reference
 
 | Condition | Description |
 |---|---|
@@ -829,7 +1024,7 @@ Event: On loaded
 
 ---
 
-## 16. Expressions Reference
+## 17. Expressions Reference
 
 | Expression | Returns | Description |
 |---|---|---|
@@ -865,7 +1060,7 @@ The context expressions in the lower half of the table are only meaningful insid
 
 ---
 
-## 17. Triggers Reference
+## 18. Triggers Reference
 
 | Trigger | Description |
 |---|---|
@@ -878,7 +1073,7 @@ The context expressions in the lower half of the table are only meaningful insid
 
 ---
 
-## 18. System Use Cases
+## 19. System Use Cases
 
 These examples are deliberately narrow. Each one isolates a single system so you can see what that system does on its own. Combinations live in the next section.
 
@@ -1021,7 +1216,7 @@ Owns the bias in a walker's turn choice.
 
 ```
 Event: On function "CarveRiver"
-  Action: AdvWalker > Define walker -> "{""id"":""river"",""startX"":20,""startY"":0,""steps"":300,""directions"":8,""maxTurn"":90,""carveValue"":2}"
+  Action: AdvWalker > Add walker -> "river", 20, 0, 300, 8, 90, "", 2
   Action: AdvWalker > Set walker "river" direction weights -> "2,6,9,6,2,0,0,0"
   Action: AdvWalker > Run walker -> "river"
   // Indices 5, 6 and 7 are the three upward headings, all weighted to zero.
@@ -1054,10 +1249,10 @@ Owns tagged placement, spacing and the placement rules.
 ```
 Event: AdvWalker > On generation complete
   Action: AdvWalker > Drop "ammo" marks along walker "main" every 12 steps, chance 0.6, min spacing 5
-  Action: System > Repeat AdvWalker.CountMarks("ammo") times
+  Action: System > For "ammo" from 0 to AdvWalker.CountMarks("ammo") - 1
     Action: System > Create object Ammo at
-            (AdvWalker.CellToLayoutX(AdvWalker.GetMarkXByIndex("ammo", loopindex)),
-             AdvWalker.CellToLayoutY(AdvWalker.GetMarkYByIndex("ammo", loopindex)))
+            (AdvWalker.CellToLayoutX(AdvWalker.GetMarkXByIndex("ammo", loopindex("ammo"))),
+             AdvWalker.CellToLayoutY(AdvWalker.GetMarkYByIndex("ammo", loopindex("ammo"))))
 ```
 
 **Use case: torches on walls, enemies in the open, from the same grid.**
@@ -1135,12 +1330,12 @@ Owns getting the generated world back out.
 
 ```
 Event: AdvWalker > On generation complete
-  Action: System > Repeat AdvWalker.CountCells(1) times
-    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex), AdvWalker.GetCellYByIndex(1, loopindex)) to tile 0
-  Action: System > Repeat AdvWalker.CountCells(2) times
-    Action: TilemapWater > Set tile (AdvWalker.GetCellXByIndex(2, loopindex), AdvWalker.GetCellYByIndex(2, loopindex)) to tile 0
-  Action: System > Repeat AdvWalker.CountCells(3) times
-    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(3, loopindex), AdvWalker.GetCellYByIndex(3, loopindex)) to tile 1
+  Action: System > For "floor" from 0 to AdvWalker.CountCells(1) - 1
+    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex("floor")), AdvWalker.GetCellYByIndex(1, loopindex("floor"))) to tile 0
+  Action: System > For "water" from 0 to AdvWalker.CountCells(2) - 1
+    Action: TilemapWater > Set tile (AdvWalker.GetCellXByIndex(2, loopindex("water")), AdvWalker.GetCellYByIndex(2, loopindex("water"))) to tile 0
+  Action: System > For "wall" from 0 to AdvWalker.CountCells(3) - 1
+    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(3, loopindex("wall")), AdvWalker.GetCellYByIndex(3, loopindex("wall"))) to tile 1
 ```
 
 **Use case: pick a spawn point from the generated floor.**
@@ -1188,8 +1383,8 @@ Event: On function "QuickSave"
   Action: System > Save game to slot "quick"
 
 Event: On loaded
-  Action: System > Repeat AdvWalker.CountCells(1) times
-    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex), AdvWalker.GetCellYByIndex(1, loopindex)) to tile 0
+  Action: System > For "cell" from 0 to AdvWalker.CountCells(1) - 1
+    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex("cell")), AdvWalker.GetCellYByIndex(1, loopindex("cell"))) to tile 0
   // The walker's remaining budget and the PRNG state both came back, so the
   // Every tick Step Walker event simply carries on and draws the identical rest of the path.
 ```
@@ -1198,7 +1393,7 @@ Event: On loaded
 
 ---
 
-## 19. Game Use Cases
+## 20. Game Use Cases
 
 ### 1. The simplest possible cave
 
@@ -1209,12 +1404,18 @@ Event: On start of layout
   Action: AdvWalker > Create grid -> 40, 30
   Action: AdvWalker > Set seed -> "cave-1"
   Action: AdvWalker > Add walker -> "cave", 20, 15, 400, 8, 180, "", 1
+  // The trailing 1 is the carve value: the number this walker writes into
+  // every cell it walks over.
   Action: AdvWalker > Run all walkers
 
 Event: AdvWalker > On generation complete
-  Action: System > Repeat AdvWalker.CountCells(1) times
-    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex), AdvWalker.GetCellYByIndex(1, loopindex)) to tile 0
+  Action: System > For "cell" from 0 to AdvWalker.CountCells(1) - 1
+    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(1, loopindex("cell")), AdvWalker.GetCellYByIndex(1, loopindex("cell"))) to tile 0
+  // Read back the same 1 you carved. Change the carve value and you change
+  // every 1 in this loop with it.
 ```
+
+That single number is the whole layering story. Give a second walker a carve value of 2 and it writes water into the same grid, and a third with 3 writes ore. Nothing else about the setup changes: you run them all, then paint each value with its own loop.
 
 ### 2. Nuclear Throne style roguelike floor
 
@@ -1256,12 +1457,12 @@ Event: On function "GeneratePlanet"
   Action: AdvWalker > Create grid -> 128, 512
   Action: AdvWalker > Set seed -> PlanetSeed
   Action: System > For "v" from 0 to 11
-    Action: AdvWalker > Define walker -> "{""id"":""vein" & loopindex("v") & """,""startX"":" & floor(random(128)) & ",""startY"":" & (30 + loopindex("v") * 40) & ",""steps"":120,""directions"":8,""maxTurn"":90,""carveValue"":2,""tag"":""vein""}"
+    Action: AdvWalker > Add walker -> "vein" & loopindex("v"), floor(random(128)), 30 + loopindex("v") * 40, 120, 8, 90, "vein", 2
   Action: AdvWalker > Run walkers tagged -> "vein"
   Action: AdvWalker > Scatter 60 "iron" marks on cells valued 2, placement Any, min spacing 4
 ```
 
-*Note:* The `random(128)` in the walker definition happens in Construct, not in the plugin, so it breaks reproducibility. Derive the start positions from the seed deterministically if speedrunners need identical planets.
+*Note:* The `random(128)` in the start position happens in Construct, not in the plugin, so it breaks reproducibility. Derive the start positions from the seed deterministically if speedrunners need identical planets.
 
 ### 4. Classic Rogue style dungeon
 
@@ -1312,7 +1513,7 @@ Event: On function "GenerateIsland"
   Action: AdvWalker > Set seed -> WorldSeed
   Action: AdvWalker > Define walker -> "{""id"":""land1"",""startX"":64,""startY"":64,""steps"":1200,""brushSize"":3,""tag"":""land""}"
   Action: AdvWalker > Define walker -> "{""id"":""land2"",""startX"":50,""startY"":70,""steps"":900,""brushSize"":3,""tag"":""land""}"
-  Action: AdvWalker > Define walker -> "{""id"":""river1"",""startX"":64,""startY"":10,""steps"":300,""directions"":3,""maxTurn"":45,""carveValue"":2,""tag"":""river""}"
+  Action: AdvWalker > Add walker -> "river1", 64, 10, 300, 3, 45, "river", 2
   Action: AdvWalker > Define walker -> "{""id"":""forest1"",""startX"":40,""startY"":40,""steps"":200,""carveValue"":3,""brushSize"":2,""tag"":""forest""}"
   Action: AdvWalker > Run walkers tagged -> "land"
   Action: AdvWalker > Run walkers tagged -> "forest"
@@ -1348,7 +1549,7 @@ Event: AdvWalker > On walker "show" stepped
 Event: On function "Shatter" (ImpactX, ImpactY, ImpactIndex)
   Action: AdvWalker > Create grid -> 24, 24
   Action: AdvWalker > Set seed -> MatchSeed & "-crack-" & ImpactIndex
-  Action: AdvWalker > Define walker -> "{""id"":""crack"",""startX"":" & ImpactX & ",""startY"":" & ImpactY & ",""steps"":40,""directions"":2,""maxTurn"":20}"
+  Action: AdvWalker > Add walker -> "crack", ImpactX, ImpactY, 40, 2, 20, "", 1
   Action: AdvWalker > Run all walkers
 
 Event: AdvWalker > On cell carved
@@ -1404,7 +1605,7 @@ Event: On loaded
 Event: On function "Strike" (StartX)
   Action: AdvWalker > Create grid -> 40, 40
   Action: AdvWalker > Set seed -> "bolt-" & StrikeIndex
-  Action: AdvWalker > Define walker -> "{""id"":""bolt"",""startX"":" & StartX & ",""startY"":0,""steps"":40,""directions"":8,""maxTurn"":45}"
+  Action: AdvWalker > Add walker -> "bolt", StartX, 0, 40, 8, 45, "", 1
   Action: AdvWalker > Set walker "bolt" direction weights -> "1,5,9,5,1,0,0,0"
   Action: AdvWalker > Run walker -> "bolt"
 
@@ -1428,8 +1629,8 @@ Event: On function "Dig" (CellX, CellY)
 
 Event: On loaded
   Action: Tilemap > Erase all
-  Action: System > Repeat AdvWalker.CountCells(0) times
-    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(0, loopindex), AdvWalker.GetCellYByIndex(0, loopindex)) to tile 2
+  Action: System > For "dug" from 0 to AdvWalker.CountCells(0) - 1
+    Action: Tilemap > Set tile (AdvWalker.GetCellXByIndex(0, loopindex("dug")), AdvWalker.GetCellYByIndex(0, loopindex("dug"))) to tile 2
 ```
 
 *Note:* This is the case where you must save the grid rather than just the seed. Player edits are not derivable from a seed.
@@ -1497,10 +1698,10 @@ Event: Every tick
 ```
 Event: AdvWalker > On generation complete
   Action: AdvWalker > Outline cells valued 1 with 3
-  Action: System > Repeat AdvWalker.CountCells(3) times
-    Action: System > Set C to AdvWalker.GetCellXByIndex(3, loopindex)
-    Action: System > Set R to AdvWalker.GetCellYByIndex(3, loopindex)
-    Action: Tilemap > Set tile (C, R) to tile (10 + AdvWalker.NeighbourCount(C, R, 1))
+  Action: System > For "wall" from 0 to AdvWalker.CountCells(3) - 1
+    Action: System > Set WallX to AdvWalker.GetCellXByIndex(3, loopindex("wall"))
+    Action: System > Set WallY to AdvWalker.GetCellYByIndex(3, loopindex("wall"))
+    Action: Tilemap > Set tile (WallX, WallY) to tile (10 + AdvWalker.NeighbourCount(WallX, WallY, 1))
     // Tiles 10 to 18 are wall variants indexed by how many floor cells touch them.
 ```
 
@@ -1566,7 +1767,7 @@ Event: On function "GenerateWorld"
   Action: AdvWalker > Add walker -> "cave1", 48, 48, 900, 8, 180, "cave", 1
   Action: AdvWalker > Add walker -> "cave2", 20, 70, 600, 8, 180, "cave", 1
   Action: AdvWalker > Define walker -> "{""id"":""river"",""startX"":0,""startY"":30,""steps"":300,""directions"":3,""maxTurn"":45,""turnChance"":0.3,""carveValue"":2,""tag"":""water""}"
-  Action: AdvWalker > Define walker -> "{""id"":""ore"",""startX"":70,""startY"":10,""steps"":200,""directions"":8,""maxTurn"":90,""carveValue"":4,""tag"":""ore""}"
+  Action: AdvWalker > Add walker -> "ore", 70, 10, 200, 8, 90, "ore", 4
   Action: AdvWalker > Set walker "ore" direction weights -> "1,4,9,4,1,0,0,0"
   Action: AdvWalker > Run walkers tagged -> "cave"
   Action: AdvWalker > Dilate cells valued 1 by 1 iterations
@@ -1638,7 +1839,7 @@ Event: On function "GenerateWorld"
 
 ---
 
-## 20. C3 Debugger
+## 21. C3 Debugger
 
 Advanced Drunken Walker publishes three sections to Construct's debugger. Open *Debug Layout* instead of *Preview*, then select the plugin's object in the inspector panel on the left.
 
@@ -1676,7 +1877,7 @@ Most generation problems are visible here in a couple of seconds. A `$seed` that
 
 ---
 
-## 21. Scripting (C3 Script / JavaScript)
+## 22. Scripting (C3 Script / JavaScript)
 
 Every one of the plugin's 57 ACEs is exposed to scripting, so anything you can do in an event sheet you can do in JavaScript.
 
@@ -1889,7 +2090,7 @@ Note the ordering in `paint`. The mark passes run after the post-processing so t
 
 ---
 
-## 22. Deep Dive: The Determinism Model
+## 23. Deep Dive: The Determinism Model
 
 ### What is guaranteed
 
@@ -1941,7 +2142,7 @@ Event: AdvWalker > On generation complete
 
 ---
 
-## 23. Deep Dive: Advanced Random Integration
+## 24. Deep Dive: Advanced Random Integration
 
 Advanced Drunken Walker ships its own seeded generator and depends on no other addon. If your project also uses the Advanced Random plugin, there are two supported ways to keep everything on one master seed. They suit different situations, so pick deliberately.
 
@@ -2017,7 +2218,7 @@ Shared seed is the default recommendation because the independence is a feature.
 
 ---
 
-## 24. Tips and Common Mistakes
+## 25. Tips and Common Mistakes
 
 - **Set the seed before you generate, not after.** *Set Seed* resets the stream. Calling it after *Run All Walkers* changes nothing about the map you just built, and it is the single most common reason a map is not reproducible. The debugger's `$seed` row makes this obvious in a second.
 
