@@ -176,7 +176,7 @@ export const properties = [
     type: PROPERTY_TYPE.CHECK,
     id: "debugMode",
     name: "Debug Mode",
-    desc: "Log walker lifecycles, re-rolled boundary steps, clamped grid sizes and injected-queue underruns to the browser console.",
+    desc: "Log walker lifecycles, re-rolled boundary steps, clamped grid sizes, injected-queue underruns and warnings about common mistakes (running with no walkers, walkers starting outside the grid) to the browser console.",
     options: {
       initialValue: false,
     },

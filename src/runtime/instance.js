@@ -47,6 +47,18 @@ const WALKER_DEFAULTS = {
   tag: "",
 };
 
+// Add Walker From Preset. Index order must match the `preset` combo items in
+// src/aces/Walkers/a.AddWalkerFromPreset.js, and the values are the Shape
+// Recipes table in the guide - update both together.
+const WALKER_PRESETS = [
+  { steps: 400, directions: 8, maxTurn: 180 }, // cave
+  { steps: 300, directions: 4, maxTurn: 90, turnChance: 0.15 }, // corridors
+  { steps: 250, directions: 3, maxTurn: 45, turnChance: 0.35, brushSize: 2 }, // river
+  { steps: 200, directions: 8, maxTurn: 90, weights: [2, 6, 9, 6, 2, 0, 0, 0] }, // ore_vein
+  { steps: 40, directions: 8, maxTurn: 45, weights: [1, 5, 9, 5, 1, 0, 0, 0] }, // lightning
+  { steps: 40, directions: 8, maxTurn: 180, brushSize: 4 }, // blob
+];
+
 // Grid offsets for the 8 neighbours by octant, where octant i is the heading
 // i * 45 degrees: index 0 is right, index 2 is down (Construct's Y axis points
 // down). Used for both walker movement and neighbourhood queries.
@@ -560,6 +572,23 @@ export default function (parentClass) {
       walker.x = walker.startX;
       walker.y = walker.startY;
       walker.stepsLeft = walker.steps;
+
+      // The most common "my map is empty" mistake: a start cell outside the
+      // grid means no legal move, so the walker finishes immediately.
+      if (
+        this._width > 0 &&
+        this._height > 0 &&
+        !this._isInside(walker.startX, walker.startY)
+      ) {
+        this._warn(
+          "walker",
+          walkerId,
+          "starts at (" + walker.startX + ", " + walker.startY + "),",
+          "outside the",
+          this._width + " x " + this._height,
+          "grid - it will finish immediately without carving anything"
+        );
+      }
 
       // Map.set on an existing key keeps its position, so redefining a walker
       // does not move it to the end of the run order and change every seed.
@@ -1214,6 +1243,61 @@ export default function (parentClass) {
       return this._height;
     }
 
+    // AsText. Character N of `characters` stands for cell value N; values
+    // with no character render as "?". Built line by line so a Text object
+    // set to this shows the whole map at a glance.
+    _asText(characters) {
+      const chars = String(characters);
+      const lines = [];
+      for (let y = 0; y < this._height; y++) {
+        let line = "";
+        for (let x = 0; x < this._width; x++) {
+          const value = this._grid[y * this._width + x];
+          line += value >= 0 && value < chars.length ? chars[value] : "?";
+        }
+        lines.push(line);
+      }
+      return lines.join("\n");
+    }
+
+    // Draw Cells To Tilemap. `objectClass` arrives as an IObjectClass from
+    // the object parameter; every picked instance of it gets the same tiles,
+    // via the public ITilemapInstance.setTileAt. Cells map 1:1 onto tile
+    // coordinates, and Construct treats tile -1 as erase, which works here
+    // unchanged.
+    _drawCellsToTilemap(value, objectClass, tile) {
+      if (!objectClass) {
+        this._warn("Draw Cells To Tilemap: no tilemap object was chosen");
+        return;
+      }
+      const cells = this._cellsWithValue(Math.floor(Number(value)) | 0);
+      if (!cells || cells.length === 0) {
+        this._warn(
+          "Draw Cells To Tilemap: no cells hold the value",
+          Math.floor(Number(value)) | 0
+        );
+        return;
+      }
+      const tileIndex = Math.floor(Number(tile));
+      const width = this._width;
+      let drewTo = 0;
+      for (const inst of objectClass.getPickedInstances()) {
+        if (typeof inst.setTileAt !== "function") {
+          this._warn(
+            "Draw Cells To Tilemap: the chosen object is not a Tilemap"
+          );
+          return;
+        }
+        for (let i = 0; i < cells.length; i++) {
+          inst.setTileAt(cells[i] % width, Math.floor(cells[i] / width), tileIndex);
+        }
+        drewTo++;
+      }
+      if (drewTo === 0) {
+        this._warn("Draw Cells To Tilemap: no tilemap instances are picked");
+      }
+    }
+
     // NeighbourCount.
     _neighbourCount(x, y, value) {
       return this._countNeighbours(
@@ -1321,6 +1405,24 @@ export default function (parentClass) {
       });
     }
 
+    // Add Walker From Preset. `preset` is the 0-based combo index into
+    // WALKER_PRESETS; anything the preset does not set takes WALKER_DEFAULTS.
+    _addWalkerFromPreset(walkerId, preset, startX, startY, tag, carveValue) {
+      const index = clamp(
+        Math.floor(toNumber(preset, 0)),
+        0,
+        WALKER_PRESETS.length - 1
+      );
+      this._registerWalker({
+        id: walkerId,
+        startX,
+        startY,
+        tag,
+        carveValue,
+        ...WALKER_PRESETS[index],
+      });
+    }
+
     // Define Walker - the full definition as JSON.
     _defineWalker(definition) {
       let parsed;
@@ -1383,6 +1485,89 @@ export default function (parentClass) {
       this._log("walker", walker.id, "carve value", walker.carveValue);
     }
 
+    // Set Walker Steps. The value becomes the walker's remaining budget, and
+    // a finished walker with steps to spend is un-finished, so "give it more
+    // steps and run it again" works the way a beginner expects.
+    _setWalkerSteps(walkerId, steps) {
+      const walker = this._walkers.get(String(walkerId));
+      if (!walker) {
+        this._warn("Set Walker Steps: no walker", walkerId);
+        return;
+      }
+      const budget = Math.max(0, Math.floor(toNumber(steps, walker.steps)));
+      walker.steps = budget;
+      walker.stepsLeft = budget;
+      if (budget > 0) walker.finished = false;
+      this._log("walker", walker.id, "steps", budget);
+    }
+
+    // Set Walker Turn Chance.
+    _setWalkerTurnChance(walkerId, chance) {
+      const walker = this._walkers.get(String(walkerId));
+      if (!walker) {
+        this._warn("Set Walker Turn Chance: no walker", walkerId);
+        return;
+      }
+      walker.turnChance = clamp(toNumber(chance, walker.turnChance), 0, 1);
+      this._log("walker", walker.id, "turn chance", walker.turnChance);
+    }
+
+    // Set Walker Brush Size. Leaves any oriented dig size alone: the square
+    // brush only applies while brushWidth and brushHeight are unset.
+    _setWalkerBrushSize(walkerId, size) {
+      const walker = this._walkers.get(String(walkerId));
+      if (!walker) {
+        this._warn("Set Walker Brush Size: no walker", walkerId);
+        return;
+      }
+      walker.brushSize = Math.max(
+        1,
+        Math.floor(toNumber(size, walker.brushSize))
+      );
+      this._log("walker", walker.id, "brush size", walker.brushSize);
+    }
+
+    // Set Walker Start Angle. The heading set is anchored at the start angle,
+    // so the derived tables are rebuilt the same way _registerWalker builds
+    // them. Weights are positional relative to the start angle, which means
+    // they rotate with it - entry 0 still weighs the new start angle.
+    _setWalkerStartAngle(walkerId, angle) {
+      const walker = this._walkers.get(String(walkerId));
+      if (!walker) {
+        this._warn("Set Walker Start Angle: no walker", walkerId);
+        return;
+      }
+      const startAngle = normAngle(toNumber(angle, walker.startAngle));
+      walker.startAngle = startAngle;
+      const headings = [];
+      const octants = [];
+      for (let i = 0; i < walker.directions; i++) {
+        const heading = normAngle(startAngle + (i * 360) / walker.directions);
+        headings.push(heading);
+        octants.push(Math.round(heading / 45) % 8);
+      }
+      walker.headings = headings;
+      walker.octants = octants;
+      // `angle` must stay a member of `headings` - _advanceWalker looks its
+      // index back up. A walker that has not started re-anchors; one mid-walk
+      // snaps to the nearest of its new headings.
+      if (!walker.started) {
+        walker.angle = headings[0];
+      } else {
+        let best = 0;
+        for (let i = 1; i < headings.length; i++) {
+          if (
+            angleDelta(headings[i], walker.angle) <
+            angleDelta(headings[best], walker.angle)
+          ) {
+            best = i;
+          }
+        }
+        walker.angle = headings[best];
+      }
+      this._log("walker", walker.id, "start angle", startAngle);
+    }
+
     // Remove Walker. Cells it already carved are left alone.
     _removeWalker(walkerId) {
       this._walkers.delete(String(walkerId));
@@ -1391,6 +1576,21 @@ export default function (parentClass) {
     // Run All Walkers. Array.from() because a trigger handler could register
     // or remove a walker while we are iterating.
     _runAllWalkers() {
+      if (this._walkers.size === 0) {
+        this._warn(
+          "Run All Walkers: no walkers are registered - add one with Add Walker first"
+        );
+      } else {
+        let unfinished = 0;
+        for (const walker of this._walkers.values()) {
+          if (!walker.finished) unfinished++;
+        }
+        if (unfinished === 0) {
+          this._warn(
+            "Run All Walkers: every walker has already finished - walkers keep their progress, so re-add them or give them more steps with Set Walker Steps to generate again"
+          );
+        }
+      }
       for (const walker of Array.from(this._walkers.values())) {
         this._runWalkerToEnd(walker);
       }
@@ -1402,9 +1602,17 @@ export default function (parentClass) {
     // Run Walkers By Tag. An empty tag runs only the untagged walkers.
     _runWalkersByTag(tag) {
       const batchTag = String(tag);
+      let matched = 0;
       for (const walker of Array.from(this._walkers.values())) {
         if (walker.tag !== batchTag) continue;
+        matched++;
         this._runWalkerToEnd(walker);
+      }
+      if (matched === 0) {
+        this._warn(
+          "Run Walkers By Tag: no walkers have the tag",
+          batchTag === "" ? "(untagged)" : batchTag
+        );
       }
       // Set before the trigger so WalkerTag reads the batch tag inside it.
       this._ctxWalker = null;

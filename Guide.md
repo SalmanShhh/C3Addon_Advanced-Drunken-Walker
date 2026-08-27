@@ -110,32 +110,11 @@ Event: AdvWalker > On generation complete
   // The For loop names its index, so loopindex("cell") stays readable once loops nest.
 ```
 
+The loop is worth knowing because it generalises, but there are two shortcuts. *Draw cells to tilemap* does the whole loop in one action: `AdvWalker > Draw cells valued 1 to Tilemap as tile 0`. And before you have a tilemap at all, set a Text object to `AdvWalker.AsText(".#")` to see the raw map instantly - one character per cell, one line per row.
+
 Run the layout and you have a winding cave painted into your Tilemap. Change the seed string and you get a different cave. Change it back and the first cave returns, cell for cell.
 
 **Step 6: check your work.** Open *Debug Layout* rather than *Preview*, select the AdvWalker object in the inspector, and you will see the grid size, the active seed, every registered walker and every mark tag. That panel answers most "why is my map empty" questions in a couple of seconds.
-
-### Upgrading from 1.0.0.0
-
-Version 1.1.0.0 renamed the API so that a size is always a width and a height, and a position is always an X and a Y. Generation behaves identically, but every renamed expression and parameter has to be updated in your event sheets, and savegames written by 1.0.0.0 no longer load.
-
-| 1.0.0.0 | 1.1.0.0 |
-|---|---|
-| `GridCols` / `GridRows` | `GridWidth` / `GridHeight` |
-| `GetCellColByIndex` / `GetCellRowByIndex` | `GetCellXByIndex` / `GetCellYByIndex` |
-| `GetMarkColByIndex` / `GetMarkRowByIndex` | `GetMarkXByIndex` / `GetMarkYByIndex` |
-| `LayoutToCol` / `LayoutToRow` | `LayoutToX` / `LayoutToY` |
-| `MarkCol` / `MarkRow` | `MarkX` / `MarkY` |
-| `CarvedCol` / `CarvedRow` | `CarvedX` / `CarvedY` |
-| `WalkerCol` / `WalkerRow` | `WalkerX` / `WalkerY` |
-| Column and Row parameters | X and Y parameters |
-| *Add Walker* Start Column / Start Row | Start X / Start Y |
-| `startCol` / `startRow` in a Walker Definition | `startX` / `startY` |
-
-Three behaviour changes come with the rename:
-
-- The grid described by *Grid Width* and *Grid Height* has always been built for you at startup. That is now stated plainly throughout this guide, because most projects never need *Create Grid* at all.
-- *Create Grid* takes a **negative** width or height to mean "use the property". A 0 used to mean that. It is now treated as a mistake: it warns in debug mode and falls back to the property rather than leaving you a grid with no cells.
-- *Add Walker* gained a trailing **Carve Value** parameter, and the new *Set Walker Carve Value* action changes it later. A walker no longer needs a *Define Walker* JSON string just to write something other than 1.
 
 ---
 
@@ -152,7 +131,7 @@ Three behaviour changes come with the rename:
 | **Empty Value** | Integer | 0 | The value a fresh grid is filled with. It is also what out-of-bounds reads return, and the only value *Outline Cells* is allowed to overwrite. |
 | **Seed** | String | *(empty)* | Initial seed. Leaving it empty derives one from the clock, which means the first run is not reproducible until you call *Set Seed*. |
 | **Random Source** | Combo | Internal seeded | `Internal seeded` uses the built-in PRNG. `Injected` consumes values queued by *Inject Random*, for example from the Advanced Random plugin. |
-| **Debug Mode** | Boolean | false | Logs walker lifecycles, boundary re-rolls, clamped grid sizes, failed scatters and injected-queue underruns to the browser console. Turn it off for release. |
+| **Debug Mode** | Boolean | false | Logs walker lifecycles, boundary re-rolls, clamped grid sizes, failed scatters and injected-queue underruns to the browser console, plus warnings for the common mistakes behind an empty map: running with no walkers registered, running when every walker already finished, a tag that matches nothing, and a walker starting outside the grid. Turn it on while building, off for release. |
 
 A grid always exists, sized from *Grid Width* and *Grid Height*, from the moment the object is created. If those properties are the size you want, you never need to call *Create Grid* at all - just seed and run your walkers. It also means `CellValue` and the grid conditions are safe to call from the first tick, and they report the empty value rather than error.
 
@@ -264,7 +243,15 @@ Every walker is built from these fields. Only `id`, `startX` and `startY` have n
 
 ### Registering walkers
 
-*Add Walker* exposes the eight fields you change most often, including the value the walker carves, and takes the defaults for the rest. It is the action you will use ninety percent of the time.
+*Add Walker From Preset* is the fastest start: pick a shape by name - Cave, Corridors, River, Ore Vein, Lightning or Blob - give it a position, and the movement settings come from the [Shape Recipes](#8-shape-recipes) table.
+
+```
+Event: On function "QuickCave"
+  Action: AdvWalker > Add "Cave" walker -> "main" at (32, 32), tag "", carving 1
+  Action: AdvWalker > Run all walkers
+```
+
+*Add Walker* exposes the eight fields you change most often, including the value the walker carves, and takes the defaults for the rest. It is the action you will use once presets stop being enough.
 
 ```
 Event: On function "BuildCave"
@@ -275,12 +262,26 @@ Event: On function "BuildCave"
   // Same grid, value 2, so CountCells(1) is floor and CountCells(2) is ore.
 ```
 
-*Define Walker* takes the whole definition as a JSON string, which is how you reach `startAngle`, `turnChance`, `brushSize` and `weights`. Anything you leave out of the JSON falls back to the default in the table above.
+Every field also has its own action, so nothing forces you into JSON: *Set Walker Steps*, *Set Walker Turn Chance*, *Set Walker Brush Size*, *Set Walker Start Angle*, *Set Walker Carve Value*, *Set Walker Dig Size* and *Set Walker Direction Weights* all change one thing on a registered walker. Register with Add Walker or a preset, then adjust:
 
 ```
 Event: On function "BuildRiver"
-  Action: AdvWalker > Define walker -> "{""id"":""river"",""startX"":0,""startY"":10,""steps"":300,""directions"":3,""maxTurn"":45,""startAngle"":0,""turnChance"":0.4,""carveValue"":2,""brushSize"":2,""tag"":""water""}"
-  // Three directions, a small max turn and a low turn chance gives a wide, lazily meandering river.
+  Action: AdvWalker > Add walker -> "river", 0, 10, 300, 3, 45, "water", 2
+  Action: AdvWalker > Set walker "river" turn chance to 0.4
+  Action: AdvWalker > Set walker "river" brush size to 2
+  // Three directions, a small max turn and a low turn chance gives a wide,
+  // lazily meandering river.
+```
+
+Two of the setters have behaviour worth spelling out. *Set Walker Steps* makes the value the walker's remaining budget and un-finishes a finished walker, so topping a walker up and running it again extends its path. *Set Walker Start Angle* rotates the whole direction set, and the direction weights rotate with it, because weight entry 0 always weighs the start angle.
+
+*Define Walker* takes the whole definition as one JSON string instead, which suits saving and loading walker configurations or generating them from data. Anything you leave out of the JSON falls back to the default in the table above.
+
+```
+Event: On function "SpawnFromData"
+  Action: AdvWalker > Define walker -> WalkerDefinitions.Get("river")
+  // The whole configuration travels as one string, so definitions can live in
+  // a Dictionary, a JSON file or a level editor.
 ```
 
 Remember that in a Construct string literal a double quote is escaped by doubling it. If the JSON fails to parse the walker is skipped and, with Debug Mode on, the console tells you exactly which string was rejected.
@@ -535,7 +536,7 @@ The pair that matters most is `directions` with `maxTurn`. A large direction set
 
 ### The recipes
 
-Each row is a starting point rather than a rule. These are all *Add Walker* parameters or Walker Definition fields, and the weights column needs either the `weights` field or *Set Walker Direction Weights*.
+The first six rows are also built in: *Add Walker From Preset* registers a Cave, Corridors, River, Ore Vein, Lightning or Blob walker with these exact values, so you only need the raw numbers to go beyond the presets. Each row is a starting point rather than a rule. These are all *Add Walker* parameters or Walker Definition fields, and the weights column needs either the `weights` field or *Set Walker Direction Weights*.
 
 | Shape | `directions` | `maxTurn` | `turnChance` | Brush | Weights |
 |---|---|---|---|---|---|
@@ -972,6 +973,7 @@ Event: On loaded
 | **Clear Grid** | Refills every cell with a value you choose. Leaves walkers, marks and the random stream alone, and does not fire On Cell Carved. |
 | **Set Cell** | Writes one cell directly. Silent, so it does not fire On Cell Carved. Use it to pre-place anchors before the walkers run. |
 | **Set Origin** | Moves the grid in layout space and optionally changes the cell size, for the coordinate expressions. Pass 0 for the cell size to keep the current one. |
+| **Draw Cells To Tilemap** | Sets one tile in a chosen Tilemap for every cell holding a value, replacing the paint loop. Cells map straight onto tile coordinates. Call once per value; tile -1 erases. |
 
 ### Randomness
 
@@ -986,8 +988,13 @@ Event: On loaded
 | Action | Description |
 |---|---|
 | **Add Walker** | Registers a walker with the eight most common settings, including its carve value. Everything else takes its default. Re-using an id replaces that walker without changing its place in the run order. |
-| **Define Walker** | Registers a walker from a full JSON definition, which is how you reach start angle, turn chance, brush size and weights. |
+| **Add Walker From Preset** | Registers a walker from a named shape: Cave, Corridors, River, Ore Vein, Lightning or Blob, with values from the Shape Recipes table. Tune it afterwards with the Set Walker actions. |
+| **Define Walker** | Registers a walker from a full JSON definition in one string, handy for definitions stored as data. Every field is also reachable through Add Walker and the Set Walker actions. |
 | **Set Walker Carve Value** | Changes the integer an existing walker writes into the cells it visits. Applies from its next step, so cells it already carved keep their old value. |
+| **Set Walker Steps** | Sets a walker's remaining step budget, and un-finishes a finished walker, so it can be topped up and run again. |
+| **Set Walker Turn Chance** | Sets the 0 to 1 probability per step that a walker considers turning. |
+| **Set Walker Brush Size** | Sets the square brush the walker stamps each step. Minimum 1; ignored while a dig size is set. |
+| **Set Walker Start Angle** | Rotates the walker's whole direction set to a new anchor angle. Direction weights rotate with it. |
 | **Set Walker Dig Size** | Switches a walker from its square brush to a rectangle that turns with it. Width across the heading is the corridor width and is always centred; depth along the heading is signed, digging ahead of the walker when positive and behind it when negative. 0 for both restores the square brush. |
 | **Set Walker Direction Weights** | Biases which direction a walker turns toward, as a comma separated list of relative weights in direction order. An empty string restores equal weights. |
 | **Remove Walker** | Unregisters a walker. Anything it already carved stays in the grid. |
@@ -1031,6 +1038,7 @@ Event: On loaded
 | `CellValue(x, y)` | Number | Value at the cell. Returns the Empty Value for out-of-bounds queries rather than erroring. |
 | `GridWidth` | Number | Current grid width in cells. |
 | `GridHeight` | Number | Current grid height in cells. |
+| `AsText(characters)` | String | The grid as text, one character per cell and one line per row. Character N of `characters` stands for value N; unmapped values show as ?. Set a Text object to it to see the map instantly. |
 | `NeighbourCount(x, y, value)` | Number | How many of the 8 neighbours hold the value. Off-grid neighbours never match, which is what makes border detection work. |
 | `CellToLayoutX(x)` | Number | Layout X of that cell's centre, from Origin X and Cell Size. |
 | `CellToLayoutY(y)` | Number | Layout Y of that cell's centre, from Origin Y and Cell Size. |

@@ -57,7 +57,7 @@
           },
           "debugMode": {
             "name": "Debug Mode",
-            "desc": "Log walker lifecycles, re-rolled boundary steps, clamped grid sizes and injected-queue underruns to the browser console."
+            "desc": "Log walker lifecycles, re-rolled boundary steps, clamped grid sizes, injected-queue underruns and warnings about common mistakes (running with no walkers, walkers starting outside the grid) to the browser console."
           }
         },
         "actions": {
@@ -84,6 +84,25 @@
               "height": {
                 "name": "Height",
                 "desc": "Grid height in cells. Negative falls back to the Grid Height property."
+              }
+            }
+          },
+          "DrawCellsToTilemap": {
+            "list-name": "Draw cells to tilemap",
+            "display-text": "{my} draw cells valued [i]{0}[/i] to [b]{1}[/b] as tile [i]{2}[/i]",
+            "description": "Set one tile in the tilemap for every cell holding the value, without writing the loop yourself. Cells map straight onto tile coordinates, so cell (4, 2) sets tile (4, 2). Call it once per value to paint layered terrain, and pass tile -1 to erase instead.",
+            "params": {
+              "value": {
+                "name": "Value",
+                "desc": "Cells holding this value are drawn."
+              },
+              "tilemap": {
+                "name": "Tilemap",
+                "desc": "The Tilemap object to set tiles in."
+              },
+              "tile": {
+                "name": "Tile",
+                "desc": "Tile index to set, as shown in the Tilemap bar. -1 erases."
               }
             }
           },
@@ -301,6 +320,45 @@
               }
             }
           },
+          "AddWalkerFromPreset": {
+            "list-name": "Add walker from preset",
+            "display-text": "{my} add [i]{1}[/i] walker [b]{0}[/b] at ([i]{2}[/i], [i]{3}[/i]), tag [i]{4}[/i], carving [i]{5}[/i]",
+            "description": "Register a walker from a named shape preset instead of raw numbers: Cave is the classic jittery carver, Corridors digs right-angled passages, River meanders in a wide ribbon, Ore Vein burrows downward, Lightning strikes down in a short jagged line, and Blob hollows out one round chamber. Presets only choose the movement settings - tune the result afterwards with the Set Walker actions, or use Add Walker for full control.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "Unique ID for this walker. Re-using an ID replaces that walker in place."
+              },
+              "preset": {
+                "name": "Preset",
+                "desc": "The shape to walk. See the Shape Recipes section of the guide for what each one looks like.",
+                "items": {
+                  "cave": "Cave",
+                  "corridors": "Corridors",
+                  "river": "River",
+                  "ore_vein": "Ore Vein",
+                  "lightning": "Lightning",
+                  "blob": "Blob"
+                }
+              },
+              "startX": {
+                "name": "Start X",
+                "desc": "Starting cell X, 0 at the left edge."
+              },
+              "startY": {
+                "name": "Start Y",
+                "desc": "Starting cell Y, 0 at the top edge."
+              },
+              "tag": {
+                "name": "Tag",
+                "desc": "Groups walkers for Run Walkers By Tag. Empty for untagged."
+              },
+              "carveValue": {
+                "name": "Carve Value",
+                "desc": "The integer this walker writes into every cell it visits."
+              }
+            }
+          },
           "DefineWalker": {
             "list-name": "Define walker",
             "display-text": "{my} define walker from [i]{0}[/i]",
@@ -351,6 +409,21 @@
               }
             }
           },
+          "SetWalkerBrushSize": {
+            "list-name": "Set walker brush size",
+            "display-text": "{my} set walker [b]{0}[/b] brush size to [i]{1}[/i]",
+            "description": "Set the square brush a walker stamps each step: 1 carves a single cell, 3 a 3x3 block. The square brush never rotates; for a corridor that turns with the walker use Set Walker Dig Size instead, which overrides this while set.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to change."
+              },
+              "size": {
+                "name": "Brush Size",
+                "desc": "Square brush edge in cells, minimum 1."
+              }
+            }
+          },
           "SetWalkerCarveValue": {
             "list-name": "Set walker carve value",
             "display-text": "{my} set walker [b]{0}[/b] carve value to [i]{1}[/i]",
@@ -397,6 +470,51 @@
               "weights": {
                 "name": "Weights",
                 "desc": "Comma separated relative weights in direction order, e.g. \"4,2,1,0,0,0,1,2\". Empty restores equal weights."
+              }
+            }
+          },
+          "SetWalkerStartAngle": {
+            "list-name": "Set walker start angle",
+            "display-text": "{my} set walker [b]{0}[/b] start angle to [i]{1}[/i]",
+            "description": "Set the angle a walker's direction set is anchored at, in degrees: 0 is right and 90 is down, matching Construct's angle system. The walker's evenly spaced headings rotate with it, and so do its direction weights, since weight entry 0 always weighs the start angle. A walker that has not started faces the new start angle; one mid-walk snaps to the nearest of its new headings.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to change."
+              },
+              "angle": {
+                "name": "Start Angle",
+                "desc": "Angle in degrees the direction set is anchored at. 0 is right, 90 is down."
+              }
+            }
+          },
+          "SetWalkerSteps": {
+            "list-name": "Set walker steps",
+            "display-text": "{my} set walker [b]{0}[/b] steps to [i]{1}[/i]",
+            "description": "Set a walker's step budget. The value becomes its remaining steps, and a finished walker given steps is un-finished, so you can top a walker up and run it again to extend its path.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to change."
+              },
+              "steps": {
+                "name": "Steps",
+                "desc": "The walker's new remaining step budget."
+              }
+            }
+          },
+          "SetWalkerTurnChance": {
+            "list-name": "Set walker turn chance",
+            "display-text": "{my} set walker [b]{0}[/b] turn chance to [i]{1}[/i]",
+            "description": "Set the probability per step, 0 to 1, that a walker considers turning at all. Low values give long straight runs between turns; 1 lets it reconsider its heading every step.",
+            "params": {
+              "walkerId": {
+                "name": "ID",
+                "desc": "ID of the walker to change."
+              },
+              "chance": {
+                "name": "Turn Chance",
+                "desc": "Probability from 0 to 1 that the walker considers turning each step."
               }
             }
           },
@@ -539,6 +657,16 @@
           }
         },
         "expressions": {
+          "AsText": {
+            "translated-name": "AsText",
+            "description": "The grid as text, one character per cell and one line per row. Character N of Characters stands for value N, so \".#\" shows empty cells as dots and value 1 as #; values with no character show as ?. Set a Text object to this to see the whole map at a glance.",
+            "params": {
+              "characters": {
+                "name": "Characters",
+                "desc": "One character per value, in value order. \".#\" maps value 0 to a dot and value 1 to #."
+              }
+            }
+          },
           "CellToLayoutX": {
             "translated-name": "CellToLayoutX",
             "description": "Layout X of the cell's centre, from Origin X and Cell Size.",
